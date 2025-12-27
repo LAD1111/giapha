@@ -10,6 +10,13 @@ export enum AppSection {
 
 export type AppTheme = 'classic' | 'tet';
 
+export interface Spouse {
+  id: string;
+  name: string;
+  birthDate?: string;
+  deathDate?: string;
+}
+
 export interface FamilyMember {
   id: string;
   name: string;
@@ -17,13 +24,15 @@ export interface FamilyMember {
   birthDate?: string;
   deathDate?: string;
   lunarDeathDate?: string;
-  spouseName?: string;
-  spouseBirthDate?: string;
-  spouseDeathDate?: string;
+  spouseName?: string; // Legacy
+  spouseBirthDate?: string; // Legacy
+  spouseDeathDate?: string; // Legacy
+  spouses?: Spouse[]; // Multi-spouse support
   children?: FamilyMember[];
   bio?: string;
   isMale: boolean;
   parentName?: string;
+  otherParentId?: string; // ID of the spouse who is the other parent
 }
 
 export interface NewsItem {

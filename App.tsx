@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppSection, FamilyMember, NewsItem, EventItem, AppData, AppTheme } from './types';
+import { AppSection, FamilyMember, NewsItem, EventItem, AppData, Spouse } from './types';
 import Navigation from './components/Navigation';
 import FamilyTree from './components/FamilyTree';
 import Events from './components/Events';
@@ -13,7 +13,7 @@ import {
 const DEFAULT_CLOUD_LINK = "https://docs.google.com/document/d/17fVZaOxx8s-gS3tFE3nj1fdmSJdYWw0mi_ar45TUoQw/edit?usp=sharing";
 
 const App: React.FC = () => {
-  // Yêu cầu: Mở web sẽ vào mục Sự kiện
+  // Mặc định vào mục SỰ KIỆN khi truy cập
   const [activeSection, setActiveSection] = useState<AppSection>(AppSection.EVENTS);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [cloudLink, setCloudLink] = useState<string>(() => localStorage.getItem('cloud_data_link') || DEFAULT_CLOUD_LINK);
@@ -30,463 +30,376 @@ const App: React.FC = () => {
   const [appData, setAppData] = useState<AppData>(() => {
     const saved = PersistenceService.loadLocal();
     if (saved) return saved;
-    
     return {
       news: SAMPLE_NEWS,
       familyTree: SAMPLE_FAMILY_TREE,
-      events: [
-        { id: 'e1', title: 'Họp Mặt Đầu Xuân', solarDate: '2025-02-15', type: 'họp mặt' }
-      ],
+      events: [{ id: 'e1', title: 'Họp Mặt Đầu Xuân', solarDate: '2025-02-15', type: 'họp mặt' }],
       bannerUrl: "https://images.unsplash.com/photo-1577908581023-95245842c8d2?auto=format&fit=crop&q=80&w=2000",
       address: CLAN_ADDRESS,
-      historyText: "Lịch sử dòng họ Lê là một hành trình dài của sự hiếu học, đoàn kết và cống hiến. Trải qua hàng trăm năm, các thế hệ tổ tiên đã bồi đắp nên những giá trị văn hóa tốt đẹp, để lại cho con cháu một gia tài tinh thần quý giá về đạo làm người và tình yêu quê hương đất nước.",
-      ancestralHouseText: "Từ đường là nơi thờ tự linh thiêng, lưu giữ hồn cốt tổ tiên qua bao thế hệ. Đây là nơi hội tụ của con cháu mỗi dịp lễ tết, là cầu nối tâm linh giữa quá khứ và hiện tại.",
-      regulations: [
-        "Tôn thờ tổ tiên, hiếu thảo với cha mẹ.",
-        "Đoàn kết, tương trợ giữa các thành viên.",
-        "Khuyến học, khuyến tài cho thế hệ trẻ.",
-        "Giữ gìn và tôn tạo di sản dòng họ."
-      ],
+      historyText: "Lịch sử dòng họ Lê là một hành trình dài...",
+      ancestralHouseText: "Từ đường là nơi thờ tự linh thiêng...",
+      regulations: ["Tôn thờ tổ tiên...", "Đoàn kết..."],
       clanName: CLAN_NAME,
       lastUpdated: new Date().toISOString(),
       theme: 'tet'
     };
   });
 
-  // Logic trích xuất ngày giỗ từ phả đồ
   const derivedGioEvents = useMemo(() => {
     const gioList: EventItem[] = [];
     const traverse = (member: FamilyMember) => {
       if (member.lunarDeathDate || member.deathDate) {
-        gioList.push({
-          id: `gio-${member.id}`,
-          title: `Giỗ cụ ${member.name}`,
-          solarDate: '', // Ngày âm lịch thường không cố định dương lịch hàng năm
-          lunarDateLabel: member.lunarDeathDate || member.deathDate,
-          type: 'giỗ',
-          description: `Ngày mất: ${member.lunarDeathDate || member.deathDate}`
-        });
+        gioList.push({ id: `gio-${member.id}`, title: `Giỗ cụ ${member.name}`, solarDate: '', lunarDateLabel: member.lunarDeathDate || member.deathDate, type: 'giỗ' });
       }
-      if (member.spouseName && member.spouseDeathDate) {
-         gioList.push({
-          id: `gio-spouse-${member.id}`,
-          title: `Giỗ cụ bà (vợ cụ ${member.name})`,
-          solarDate: '',
-          lunarDateLabel: member.spouseDeathDate,
-          type: 'giỗ',
-          description: `Ngày mất: ${member.spouseDeathDate}`
-        });
-      }
+      const spouses = member.spouses || (member.spouseName ? [{ id: 'legacy', name: member.spouseName, deathDate: member.spouseDeathDate }] : []);
+      spouses.forEach((s, idx) => {
+        if (s.deathDate) {
+          gioList.push({ id: `gio-s-${member.id}-${idx}`, title: `Giỗ cụ bà (Vợ ${idx + 1} cụ ${member.name})`, solarDate: '', lunarDateLabel: s.deathDate, type: 'giỗ' });
+        }
+      });
       member.children?.forEach(traverse);
     };
     traverse(appData.familyTree);
     return gioList;
   }, [appData.familyTree]);
 
-  // Gộp sự kiện hệ thống và sự kiện từ phả đồ
-  const allEvents = useMemo(() => {
-    return [...appData.events, ...derivedGioEvents];
-  }, [appData.events, derivedGioEvents]);
+  const allEvents = useMemo(() => [...appData.events, ...derivedGioEvents], [appData.events, derivedGioEvents]);
 
-  useEffect(() => {
-    document.body.className = appData.theme === 'classic' ? 'theme-classic' : '';
-  }, [appData.theme]);
-
-  useEffect(() => {
-    const autoSync = async () => {
-      setIsSyncing(true);
-      const data = await PersistenceService.fetchFromCloud(cloudLink);
-      if (data) {
-        setAppData(data);
-      }
-      setIsSyncing(false);
-    };
-    autoSync();
-  }, []);
-
-  useEffect(() => {
-    PersistenceService.saveLocal(appData);
-  }, [appData]);
-
-  const handleSync = async () => {
-    if (!cloudLink) {
-      showToast("Vui lòng cung cấp link Google Doc!", "info");
-      return;
-    }
-    setIsSyncing(true);
-    const cloudData = await PersistenceService.fetchFromCloud(cloudLink);
-    if (cloudData) {
-      setAppData(cloudData);
-      showToast("Đồng bộ dữ liệu thành công!", "success");
-    } else {
-      showToast("Lỗi đồng bộ. Hãy đảm quả Google Doc ở chế độ Công Khai!", "error");
-    }
-    setIsSyncing(false);
-  };
+  useEffect(() => { document.body.className = appData.theme === 'classic' ? 'theme-classic' : ''; }, [appData.theme]);
+  useEffect(() => { PersistenceService.saveLocal(appData); }, [appData]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
+  const handleSync = async () => {
+    setIsSyncing(true);
+    const cloudData = await PersistenceService.fetchFromCloud(cloudLink);
+    if (cloudData) { setAppData(cloudData); showToast("Đồng bộ thành công!"); }
+    setIsSyncing(false);
+  };
+
   const updateData = (updates: Partial<AppData>) => {
     setAppData(prev => ({ ...prev, ...updates, lastUpdated: new Date().toISOString() }));
   };
 
-  const handleCloudLinkChange = (link: string) => {
-    setCloudLink(link);
-    localStorage.setItem('cloud_data_link', link);
-  };
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123') {
-      setIsAdmin(true);
-      setShowLogin(false);
-      setPassword('');
-      showToast("Đã kích hoạt chế độ Quản trị dòng họ", "success");
-    } else {
-      showToast("Mật khẩu không đúng!", "error");
-    }
+    if (password === 'admin123') { setIsAdmin(true); setShowLogin(false); setPassword(''); showToast("Chế độ Quản trị đã mở"); }
+    else showToast("Sai mật khẩu!", "error");
   };
 
-  const exportBackup = () => {
-    const jsonString = JSON.stringify(appData, null, 2);
-    navigator.clipboard.writeText(jsonString).then(() => {
-      showToast("Đã sao chép JSON! Hãy dán vào Google Doc.", "success");
-    });
+  const deleteMember = (id: string) => {
+    if (id === appData.familyTree.id) {
+      showToast("Không thể xoá Cụ Tổ!", "error");
+      return;
+    }
+    const removeRecursive = (node: FamilyMember): FamilyMember => {
+      if (!node.children) return node;
+      return {
+        ...node,
+        children: node.children
+          .filter(child => child.id !== id)
+          .map(removeRecursive)
+      };
+    };
+    const newTree = removeRecursive(appData.familyTree);
+    updateData({ familyTree: newTree });
+    showToast("Đã xoá thành viên khỏi phả hệ");
+  };
+
+  const updateMemberInTree = (updatedMember: FamilyMember) => {
+    const updateRecursive = (node: FamilyMember): FamilyMember => {
+      if (node.id === updatedMember.id) return updatedMember;
+      if (!node.children) return node;
+      return {
+        ...node,
+        children: node.children.map(updateRecursive)
+      };
+    };
+    updateData({ familyTree: updateRecursive(appData.familyTree) });
+  };
+
+  const addChildToMember = (parentId: string) => {
+    const newChild: FamilyMember = {
+      id: `m-${Date.now()}`,
+      name: 'Thành viên mới',
+      generation: 0,
+      isMale: true,
+      children: []
+    };
+    const addRecursive = (node: FamilyMember): FamilyMember => {
+      if (node.id === parentId) {
+        newChild.generation = node.generation + 1;
+        return {
+          ...node,
+          children: [...(node.children || []), newChild]
+        };
+      }
+      if (!node.children) return node;
+      return {
+        ...node,
+        children: node.children.map(addRecursive)
+      };
+    };
+    const newTree = addRecursive(appData.familyTree);
+    updateData({ familyTree: newTree });
+    setEditingMember(newChild);
   };
 
   const renderSection = () => {
     switch (activeSection) {
+      case AppSection.TREE:
+        return <FamilyTree 
+          root={appData.familyTree} 
+          isAdmin={isAdmin} 
+          onEditMember={(m) => {
+            const memberToEdit = {...m};
+            if (memberToEdit.spouseName && (!memberToEdit.spouses || memberToEdit.spouses.length === 0)) {
+               memberToEdit.spouses = [{ id: 'legacy-' + m.id, name: memberToEdit.spouseName, deathDate: memberToEdit.spouseDeathDate }];
+            }
+            setEditingMember(memberToEdit);
+          }} 
+          onDeleteMember={deleteMember}
+          onAddChild={(p) => addChildToMember(p.id)} 
+        />;
+      case AppSection.EVENTS:
+        return <Events events={allEvents} isAdmin={isAdmin} onAddEvent={(e) => updateData({ events: [...appData.events, e] })} onDeleteEvent={(id) => updateData({ events: appData.events.filter(ev => ev.id !== id) })} />;
       case AppSection.NEWS:
         return (
           <div className="animate-fadeIn space-y-12">
-            <div className="text-center">
-              <h2 className="text-5xl font-traditional text-primary font-bold mb-4">Tin Tức & Thông Báo</h2>
-              <div className="h-1.5 w-32 bg-gold mx-auto rounded-full"></div>
-            </div>
+            <h2 className="text-5xl font-traditional text-primary font-bold text-center">Tin Tức Dòng Họ</h2>
             {isAdmin && (
-              <div className="flex justify-center">
-                <button onClick={() => setEditingNews({ id: Date.now().toString(), title: '', date: new Date().toLocaleDateString('vi-VN'), summary: '', content: '', imageUrl: 'https://picsum.photos/seed/new/800/400' })} className="bg-primary text-white px-10 py-4 rounded-full font-black shadow-xl hover:opacity-90 transition-all border-2 border-gold/30 flex items-center gap-2">
-                  <span>✍️</span> Soạn tin mới
-                </button>
-              </div>
+              <div className="flex justify-center"><button onClick={() => setEditingNews({ id: Date.now().toString(), title: '', date: new Date().toLocaleDateString('vi-VN'), summary: '', content: '' })} className="bg-primary text-white px-10 py-4 rounded-full font-black shadow-xl hover:scale-105 transition-transform">Soạn tin mới</button></div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
               {appData.news.map((item) => (
-                <div key={item.id} className="bg-white rounded-3xl shadow-lg overflow-hidden border border-red-900/5 group relative">
-                  <div className="h-64 overflow-hidden relative">
-                    <img src={item.imageUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={item.title} />
+                <div key={item.id} className="bg-white rounded-3xl shadow-lg overflow-hidden group border border-red-900/5 hover:shadow-2xl transition-all">
+                  <div className="h-64 bg-gray-100 relative">
+                    <img src={item.imageUrl || 'https://picsum.photos/seed/clan/800/400'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={item.title} />
                     {isAdmin && (
-                      <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setEditingNews(item)} className="bg-white/90 p-2 rounded-full shadow-lg hover:bg-gold transition-all">✏️</button>
-                        <button onClick={() => setNewsToDelete(item)} className="bg-white/90 p-2 rounded-full shadow-lg hover:bg-red-600 hover:text-white transition-all">🗑️</button>
-                      </div>
+                      <div className="absolute top-4 right-4 flex gap-2"><button onClick={() => setEditingNews(item)} className="bg-white/95 p-2 rounded-full shadow-lg">✏️</button><button onClick={() => setNewsToDelete(item)} className="bg-white/95 p-2 rounded-full shadow-lg text-red-600">🗑️</button></div>
                     )}
                   </div>
                   <div className="p-8">
                     <span className="text-[10px] font-black text-primary uppercase tracking-widest">{item.date}</span>
-                    <h3 className="text-2xl font-traditional font-bold text-gray-900 mt-2 mb-4">{item.title}</h3>
-                    <p className="text-gray-600 text-sm line-clamp-3 mb-6">{item.summary}</p>
-                    <button className="text-primary font-bold flex items-center gap-2 hover:translate-x-1 transition-transform">Xem thêm →</button>
+                    <h3 className="text-2xl font-traditional font-bold mt-2 mb-4 group-hover:text-primary transition-colors">{item.title}</h3>
+                    <p className="text-gray-600 text-sm mb-6 line-clamp-3">{item.summary}</p>
+                    <button className="text-[10px] font-black uppercase text-primary tracking-widest border-b-2 border-primary/20 pb-1">Xem chi tiết</button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         );
-      case AppSection.TREE:
-        return <FamilyTree root={appData.familyTree} isAdmin={isAdmin} onEditMember={setEditingMember} onAddChild={(p) => {
-          const newChild: FamilyMember = { id: `m-${Date.now()}`, name: 'Thành viên mới', generation: p.generation + 1, isMale: true };
-          const addNode = (node: FamilyMember): FamilyMember => {
-            if (node.id === p.id) return { ...node, children: [...(node.children || []), newChild] };
-            if (node.children) return { ...node, children: node.children.map(addNode) };
-            return node;
-          };
-          updateData({ familyTree: addNode(appData.familyTree) });
-          setEditingMember(newChild);
-        }} />;
       case AppSection.CHRONICLES:
         return (
           <div className="max-w-4xl mx-auto animate-fadeIn">
-            <div className="paper-texture p-10 md:p-20 shadow-2xl rounded-sm border-[12px] md:border-[24px] border-double border-red-900/10">
-              <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-red-900/5 pb-8 mb-10 gap-4">
-                <h2 className="text-4xl md:text-5xl font-traditional text-gray-900 italic font-black">Phả Kỹ Gia Tộc</h2>
-                {isAdmin && (
-                  <button onClick={() => setIsEditingText(!isEditingText)} className="bg-primary text-gold px-8 py-2 rounded-full font-black text-xs uppercase shadow-lg">
-                    {isEditingText ? "Hoàn tất" : "Biên tập"}
-                  </button>
-                )}
+            <div className="paper-texture p-10 md:p-20 shadow-2xl rounded-sm border-[12px] border-double border-red-900/10 relative">
+              <div className="flex justify-between items-center mb-10 border-b-4 border-red-900/5 pb-8">
+                <h2 className="text-5xl font-traditional italic font-black">Phả Kỹ</h2>
+                {isAdmin && <button onClick={() => setIsEditingText(!isEditingText)} className="bg-primary text-gold px-8 py-2 rounded-full text-xs font-black uppercase">{isEditingText ? "Xong" : "Sửa"}</button>}
               </div>
-              {isEditingText ? (
-                <textarea 
-                  value={appData.historyText} 
-                  onChange={(e) => updateData({ historyText: e.target.value })} 
-                  className="w-full h-[600px] p-6 md:p-10 border-4 border-gold/10 bg-transparent font-traditional text-lg md:text-xl leading-relaxed outline-none focus:border-gold/30 transition-all" 
-                />
-              ) : (
-                <div className="drop-cap whitespace-pre-wrap leading-relaxed text-gray-800 font-traditional text-lg md:text-2xl text-justify">
-                  {appData.historyText}
-                </div>
-              )}
+              {isEditingText ? <textarea value={appData.historyText} onChange={(e) => updateData({ historyText: e.target.value })} className="w-full h-96 p-6 border-4 border-gold/10 bg-transparent font-traditional text-lg leading-relaxed focus:border-gold outline-none" /> : <div className="drop-cap whitespace-pre-wrap leading-relaxed text-gray-800 font-traditional text-xl">{appData.historyText}</div>}
             </div>
           </div>
         );
       case AppSection.ANCESTRAL_HOUSE:
         return (
-          <div className="max-w-5xl mx-auto animate-fadeIn space-y-12">
-            <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border border-red-900/5">
-              <div className="h-[300px] md:h-[500px] relative">
-                <img src="https://images.unsplash.com/photo-1598640845355-668b5550dfb0?auto=format&fit=crop&q=80&w=1600" className="w-full h-full object-cover" alt="Từ Đường" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                <div className="absolute bottom-10 left-10 md:bottom-16 md:left-16">
-                   <h2 className="text-4xl md:text-7xl font-traditional text-white font-black">Từ Đường Dòng Họ</h2>
-                   <p className="text-gold font-bold text-lg md:text-2xl mt-2 md:mt-4">{appData.address}</p>
-                </div>
-              </div>
-              <div className="p-8 md:p-16">
-                 {isEditingText ? (
-                   <textarea value={appData.ancestralHouseText} onChange={(e) => updateData({ ancestralHouseText: e.target.value })} className="w-full h-40 border p-4 rounded-xl font-traditional text-lg" />
-                 ) : (
-                   <p className="text-gray-700 leading-relaxed font-traditional text-xl md:text-3xl italic border-l-8 border-gold pl-6 md:pl-12 py-4 bg-red-50/20">
-                     {appData.ancestralHouseText}
-                   </p>
-                 )}
-                 {isAdmin && (
-                   <button onClick={() => setIsEditingText(!isEditingText)} className="mt-8 bg-primary text-gold px-8 py-3 rounded-full font-black uppercase text-xs">
-                     {isEditingText ? "Lưu thay đổi" : "Chỉnh sửa nội dung"}
-                   </button>
-                 )}
-              </div>
+          <div className="max-w-4xl mx-auto animate-fadeIn">
+            <div className="bg-white p-10 md:p-20 shadow-2xl rounded-[3rem] border border-red-900/5">
+               <h2 className="text-5xl font-traditional text-primary font-bold mb-10 text-center">Từ Đường Dòng Họ</h2>
+               <div className="prose prose-red max-w-none text-gray-700 leading-relaxed font-serif text-lg">
+                 {appData.ancestralHouseText}
+               </div>
             </div>
           </div>
         );
       case AppSection.REGULATIONS:
         return (
           <div className="max-w-4xl mx-auto animate-fadeIn">
-            <div className="bg-[#fffcf0] p-10 md:p-16 shadow-2xl rounded-sm border-[16px] md:border-[32px] border-double border-gray-900/10 text-center">
-               <h2 className="text-4xl md:text-6xl font-traditional text-primary font-black uppercase mb-8 md:mb-12">Tộc Ước</h2>
-               {isEditingText ? (
-                 <textarea value={appData.regulations.join('\n')} onChange={(e) => updateData({ regulations: e.target.value.split('\n') })} className="w-full h-80 border p-4 font-traditional text-lg" />
-               ) : (
-                 <div className="space-y-6 md:space-y-10 text-left max-w-2xl mx-auto">
-                    {appData.regulations.map((reg, idx) => (
-                      <div key={idx} className="flex gap-4 md:gap-8 items-start group">
-                        <div className="w-10 h-10 md:w-14 md:h-14 bg-primary text-gold rounded-full flex items-center justify-center font-black text-lg md:text-2xl flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform">{idx + 1}</div>
-                        <p className="text-xl md:text-3xl text-gray-900 font-traditional font-bold italic border-b border-gold/10 pb-2 flex-1">{reg}</p>
+             <div className="bg-red-900 p-1 rounded-t-[3rem]">
+               <div className="bg-white p-10 md:p-20 shadow-2xl rounded-t-[2.5rem]">
+                  <h2 className="text-4xl font-traditional text-primary font-black mb-12 text-center uppercase tracking-widest">Tộc Ước & Quy Định</h2>
+                  <div className="space-y-6">
+                    {appData.regulations.map((reg, i) => (
+                      <div key={i} className="flex gap-6 items-start group">
+                        <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-900 flex items-center justify-center font-black flex-shrink-0 group-hover:bg-red-900 group-hover:text-gold transition-all">
+                          {i + 1}
+                        </div>
+                        <p className="text-gray-800 font-medium text-lg pt-2">{reg}</p>
                       </div>
                     ))}
-                 </div>
-               )}
-               {isAdmin && (
-                 <button onClick={() => setIsEditingText(!isEditingText)} className="mt-8 md:mt-16 bg-primary text-gold px-10 md:px-14 py-3 md:py-4 rounded-full font-black uppercase text-xs md:text-sm shadow-xl">
-                   {isEditingText ? "Lưu Tộc Ước" : "Biên tập Tộc Ước"}
-                 </button>
-               )}
-            </div>
+                  </div>
+               </div>
+             </div>
           </div>
         );
-      case AppSection.EVENTS:
-        return <Events events={allEvents} isAdmin={isAdmin} onAddEvent={(e) => updateData({ events: [...appData.events, e] })} onDeleteEvent={(id) => updateData({ events: appData.events.filter(ev => ev.id !== id) })} />;
-      default: return null;
+      default: return <div className="text-center py-20 text-gray-400 font-bold uppercase tracking-widest">Đang phát triển...</div>;
     }
   };
 
   return (
     <div className="min-h-screen pb-32">
       {isAdmin && (
-        <AdminPanel 
-          cloudLink={cloudLink} 
-          theme={appData.theme || 'tet'}
-          onCloudLinkChange={handleCloudLinkChange} 
-          onThemeChange={(theme) => updateData({ theme })}
-          onExport={exportBackup} 
-          onLogout={() => setIsAdmin(false)} 
-        />
+        <AdminPanel cloudLink={cloudLink} theme={appData.theme || 'tet'} onCloudLinkChange={(l) => { setCloudLink(l); localStorage.setItem('cloud_data_link', l); }} onThemeChange={(t) => updateData({ theme: t })} onExport={() => { navigator.clipboard.writeText(JSON.stringify(appData, null, 2)); showToast("Đã sao chép JSON!"); }} onLogout={() => setIsAdmin(false)} />
       )}
-
-      <div className="bg-primary text-gold text-[10px] py-1.5 text-center font-black tracking-[0.4em] uppercase border-b border-gold/20">
-         Gia Phả Trực Tuyến - {appData.clanName} - Đồng bộ Google Docs
-      </div>
-
-      <header className="relative w-full h-[250px] md:h-[450px] lg:h-[600px] flex items-center justify-center bg-black overflow-hidden shadow-2xl">
-        <img src={appData.bannerUrl} className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000" alt="Clan Banner" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10"></div>
-        <div className="absolute bottom-4 right-4 md:bottom-10 md:right-10 flex flex-col md:flex-row gap-2 md:gap-4 z-30">
-           {isAdmin && (
-             <button 
-               onClick={() => setShowBannerEdit(true)}
-               className="bg-white/90 text-red-950 px-4 md:px-6 py-2 md:py-3 rounded-full font-black text-[10px] md:text-xs uppercase hover:bg-gold transition-all shadow-xl active:scale-95 border border-red-900/10"
-             >
-               🖼️ Đổi ảnh bìa
-             </button>
-           )}
-           <button 
-             onClick={handleSync} 
-             disabled={isSyncing} 
-             className="bg-gold/90 text-red-950 px-4 md:px-6 py-2 md:py-3 rounded-full font-black text-[10px] md:text-xs uppercase flex items-center gap-2 hover:bg-white transition-all shadow-xl active:scale-95 disabled:opacity-50 border border-gold/30"
-           >
-             {isSyncing ? "⌛ Đang tải..." : "🔄 Cập nhật từ Google Doc"}
-           </button>
+      <div className="bg-primary text-gold text-[10px] py-1.5 text-center font-black tracking-[0.4em] uppercase border-b border-gold/20">Gia Phả Trực Tuyến - {appData.clanName}</div>
+      <header className="relative w-full h-[250px] md:h-[450px] flex items-center justify-center bg-black overflow-hidden shadow-2xl">
+        <img src={appData.bannerUrl} className="absolute inset-0 w-full h-full object-cover opacity-80" alt="Banner" />
+        {/* Đã xóa tiêu đề và khẩu hiệu đè lên ảnh theo yêu cầu */}
+        <div className="absolute bottom-4 right-4 flex gap-2 z-30">
+           {isAdmin && <button onClick={() => setShowBannerEdit(true)} className="bg-white/90 text-red-950 px-4 py-2 rounded-full font-black text-xs uppercase shadow-xl hover:bg-white">🖼️ Đổi ảnh</button>}
+           <button onClick={handleSync} disabled={isSyncing} className="bg-gold/90 text-red-950 px-4 py-2 rounded-full font-black text-xs uppercase shadow-xl hover:bg-white">{isSyncing ? "⌛ Tải..." : "🔄 Đồng bộ"}</button>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 mt-[-40px] md:mt-[-60px] relative z-20">
+      <div className="max-w-7xl mx-auto px-4 mt-[-40px] relative z-20">
         <Navigation activeSection={activeSection} onSectionChange={setActiveSection} />
         <main className="mt-10 md:mt-20">{renderSection()}</main>
       </div>
 
-      {showBannerEdit && (
-        <div className="fixed inset-0 bg-black/90 z-[500] flex items-center justify-center p-8 backdrop-blur-md">
-          <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg text-center shadow-2xl border-4 border-gold">
-            <h3 className="text-2xl md:text-3xl font-traditional font-black text-gray-900 mb-4 md:mb-6">Thay đổi ảnh bìa</h3>
-            <p className="text-xs md:text-sm text-gray-500 mb-6">Dán link ảnh vào đây:</p>
-            <input 
-              type="text" 
-              defaultValue={appData.bannerUrl}
-              onBlur={(e) => updateData({ bannerUrl: e.target.value })}
-              className="w-full border-2 border-gray-100 rounded-2xl p-4 mb-8 outline-none focus:border-gold"
-              placeholder="https://..."
-            />
-            <div className="flex gap-4">
-              <button onClick={() => setShowBannerEdit(false)} className="flex-1 bg-primary text-gold py-3 md:py-4 rounded-2xl font-black uppercase text-xs md:text-sm">Hoàn tất</button>
-              <button onClick={() => setShowBannerEdit(false)} className="flex-1 bg-gray-100 text-gray-600 py-3 md:py-4 rounded-2xl font-black uppercase text-xs md:text-sm">Đóng</button>
+      {editingMember && (
+        <div className="fixed inset-0 bg-black/95 z-[500] flex items-center justify-center p-4 md:p-8 overflow-y-auto backdrop-blur-md animate-fadeIn">
+          <div className="bg-white p-6 md:p-12 rounded-[2.5rem] w-full max-w-5xl shadow-2xl border-4 border-gold/20 relative">
+            <button onClick={() => setEditingMember(null)} className="absolute top-6 right-6 text-gray-400 hover:text-red-600 text-3xl transition-colors">×</button>
+            <div className="flex flex-col md:flex-row justify-between items-start border-b pb-8 mb-8 gap-6">
+              <div>
+                <h3 className="text-3xl font-traditional font-black text-gray-900">Thông tin: {editingMember.name || 'Thành viên mới'}</h3>
+                <p className="text-primary font-black uppercase text-[10px] tracking-widest mt-1">Thế hệ thứ {editingMember.generation}</p>
+              </div>
+              <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+                <button onClick={() => setEditingMember({...editingMember, isMale: true})} className={`px-8 py-3 rounded-xl text-xs font-black uppercase transition-all ${editingMember.isMale ? 'bg-primary text-white shadow-xl scale-105' : 'text-gray-400'}`}>Nam</button>
+                <button onClick={() => setEditingMember({...editingMember, isMale: false})} className={`px-8 py-3 rounded-xl text-xs font-black uppercase transition-all ${!editingMember.isMale ? 'bg-pink-600 text-white shadow-xl scale-105' : 'text-gray-400'}`}>Nữ</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              <div className="space-y-8">
+                <h4 className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary"></span> 1. Thông tin cá nhân
+                </h4>
+                <div className="space-y-5">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Họ và tên</label>
+                    <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl focus:border-gold outline-none font-bold text-lg" placeholder="Ví dụ: Lê Văn A" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Năm sinh</label>
+                      <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold" placeholder="19xx" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Ngày mất (ÂL)</label>
+                      <input type="text" value={editingMember.lunarDeathDate || editingMember.deathDate || ''} onChange={(e) => setEditingMember({...editingMember, lunarDeathDate: e.target.value, deathDate: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold text-red-900" placeholder="15/1" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Tiểu sử ngắn</label>
+                    <textarea value={editingMember.bio || ''} onChange={(e) => setEditingMember({...editingMember, bio: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-medium h-24" placeholder="Thông tin thêm..." />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-8">
+                <div className="flex justify-between items-center">
+                   <h4 className="text-[11px] font-black uppercase tracking-widest text-pink-700 flex items-center gap-2">
+                     <span className="w-2 h-2 rounded-full bg-pink-600"></span> 2. Vợ / Chồng
+                   </h4>
+                   <button onClick={() => setEditingMember({...editingMember, spouses: [...(editingMember.spouses || []), { id: `s-${Date.now()}`, name: '' }]})} className="bg-pink-100 text-pink-700 w-8 h-8 rounded-full flex items-center justify-center font-bold hover:bg-pink-600 hover:text-white transition-all shadow-sm">+</button>
+                </div>
+                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-hide">
+                  {(editingMember.spouses || []).map((s, idx) => (
+                    <div key={s.id} className="p-5 bg-pink-50/50 border-2 border-pink-100/50 rounded-2xl relative group">
+                      <button onClick={() => setEditingMember({...editingMember, spouses: editingMember.spouses?.filter(sp => sp.id !== s.id)})} className="absolute -top-3 -right-3 bg-red-100 text-red-600 w-7 h-7 rounded-full text-sm opacity-0 group-hover:opacity-100 transition-all shadow-md">×</button>
+                      <div className="space-y-4">
+                        <input type="text" value={s.name} onChange={(e) => {
+                            const newSpouses = [...(editingMember.spouses || [])];
+                            newSpouses[idx].name = e.target.value;
+                            setEditingMember({...editingMember, spouses: newSpouses});
+                          }} className="w-full bg-white border-b-2 border-pink-200 p-2 outline-none font-bold text-pink-950" placeholder="Họ tên vợ/chồng..." />
+                        <div className="flex gap-2 items-center">
+                          <span className="text-[8px] font-black uppercase text-pink-300">Giỗ ÂL:</span>
+                          <input type="text" value={s.deathDate || ''} onChange={(e) => {
+                              const newSpouses = [...(editingMember.spouses || [])];
+                              newSpouses[idx].deathDate = e.target.value;
+                              setEditingMember({...editingMember, spouses: newSpouses});
+                            }} className="flex-1 bg-transparent border-b border-pink-100 p-1 text-xs" placeholder="Ngày..." />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-8">
+                 <div className="flex justify-between items-center">
+                   <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2">
+                     <span className="w-2 h-2 rounded-full bg-emerald-600"></span> 3. Con cái
+                   </h4>
+                   <button onClick={() => addChildToMember(editingMember.id)} className="bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm">Thêm con</button>
+                 </div>
+                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-hide">
+                    {(editingMember.children || []).map((child, idx) => (
+                      <div key={child.id} className="p-4 bg-emerald-50/50 border-2 border-emerald-100/30 rounded-2xl flex flex-col gap-3">
+                         <div className="flex justify-between items-center">
+                            <span className="font-bold text-emerald-950 text-sm truncate max-w-[120px]">{child.name}</span>
+                            <button onClick={() => {
+                                const newChildren = [...(editingMember.children || [])];
+                                newChildren.splice(idx, 1);
+                                setEditingMember({...editingMember, children: newChildren});
+                              }} className="text-[10px] font-black text-red-400 hover:text-red-600">Xoá</button>
+                         </div>
+                         <div className="flex flex-col gap-1">
+                            <label className="text-[8px] font-black uppercase text-emerald-300 tracking-wider">Là con của bà:</label>
+                            <select value={child.otherParentId || ''} onChange={(e) => {
+                                const newChildren = [...(editingMember.children || [])];
+                                newChildren[idx] = {...newChildren[idx], otherParentId: e.target.value};
+                                setEditingMember({...editingMember, children: newChildren});
+                              }} className="w-full bg-white border border-emerald-100 p-2 rounded-xl text-xs font-bold text-emerald-900 outline-none">
+                               <option value="">-- Không xác định --</option>
+                               {(editingMember.spouses || []).map(s => (
+                                 <option key={s.id} value={s.id}>{s.name || 'Vợ chưa đặt tên'}</option>
+                               ))}
+                            </select>
+                         </div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-4 mt-16 pt-10 border-t-4 border-gray-50">
+              <button onClick={() => { updateMemberInTree(editingMember); setEditingMember(null); showToast("Đã cập nhật gia phả"); }} className="bg-primary text-gold px-12 py-5 rounded-2xl font-black uppercase shadow-2xl flex-1 hover:brightness-110 active:scale-95 transition-all text-sm tracking-widest">Lưu thay đổi</button>
+              <button onClick={() => setEditingMember(null)} className="bg-gray-100 text-gray-500 px-12 py-5 rounded-2xl font-black uppercase flex-1 hover:bg-gray-200 transition-all text-sm tracking-widest">Hủy & Đóng</button>
             </div>
           </div>
         </div>
       )}
 
       {showLogin && (
-        <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-8 backdrop-blur-md">
-           <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3rem] border-8 border-gray-900 w-full max-w-md text-center shadow-2xl">
-              <h3 className="text-3xl md:text-4xl font-traditional font-black text-gray-900 mb-6 md:mb-8">Quản Trị Viên</h3>
+        <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-8 backdrop-blur-md animate-fadeIn">
+           <div className="bg-white p-12 rounded-[3rem] border-8 border-gray-900 w-full max-w-md text-center shadow-2xl">
+              <h3 className="text-4xl font-traditional font-black text-gray-900 mb-8">Admin Access</h3>
               <form onSubmit={handleLogin} className="space-y-6">
-                 <input 
-                   type="password" 
-                   value={password} 
-                   onChange={(e) => setPassword(e.target.value)} 
-                   className="w-full border-4 border-gray-100 rounded-2xl p-4 text-center text-xl md:text-2xl font-black focus:border-primary outline-none" 
-                   placeholder="••••" 
-                 />
-                 <button type="submit" className="w-full bg-primary text-gold py-4 rounded-2xl font-black uppercase hover:opacity-90 shadow-lg active:scale-95 text-xs md:text-sm">Đăng nhập</button>
-                 <button type="button" onClick={() => setShowLogin(false)} className="text-gray-400 text-[10px] font-bold uppercase hover:text-primary">Quay lại</button>
+                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border-4 border-gray-100 rounded-2xl p-5 text-center text-3xl font-black outline-none focus:border-primary transition-all" placeholder="••••" />
+                 <button type="submit" className="w-full bg-primary text-gold py-5 rounded-2xl font-black uppercase text-sm tracking-widest shadow-xl">Kích hoạt quản trị</button>
+                 <button type="button" onClick={() => setShowLogin(false)} className="text-gray-400 text-[10px] font-black uppercase mt-6 block mx-auto tracking-widest hover:text-primary transition-colors">Hủy bỏ</button>
               </form>
            </div>
         </div>
       )}
 
       {toast && (
-        <div className={`fixed bottom-4 right-4 md:bottom-10 md:right-10 z-[500] px-6 md:px-8 py-3 md:py-4 rounded-2xl font-bold shadow-2xl animate-fadeIn flex items-center gap-3 border-2 text-xs md:text-sm ${
-          toast.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 
-          toast.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 
-          'bg-blue-50 text-blue-800 border-blue-200'
-        }`}>
-          <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
-          {toast.message}
+        <div className={`fixed bottom-10 right-10 z-[1000] px-10 py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-fadeIn flex items-center gap-4 border-4 ${toast.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200'}`}>
+          <span className="text-lg">{toast.type === 'error' ? '❌' : '✅'}</span> {toast.message}
         </div>
       )}
 
-      <footer className="mt-20 md:mt-40 bg-primary py-12 md:py-24 text-center border-t-8 border-gold px-4">
-         <h4 className="text-3xl md:text-5xl font-traditional text-gold font-black uppercase mb-6 md:mb-8">{appData.clanName}</h4>
-         <p className="text-yellow-100 font-serif italic text-lg md:text-xl">"Tổ Tông Công Đức Thiên Niên Thịnh - Tử Hiếu Tôn Hiền Vạn Đại Vinh"</p>
-         {!isAdmin && (
-           <button onClick={() => setShowLogin(true)} className="mt-8 md:mt-12 text-gold/30 hover:text-gold text-[10px] font-black uppercase tracking-[0.5em]">
-             🔒 Quản trị hệ thống
-           </button>
-         )}
+      <footer className="mt-40 bg-primary py-32 text-center border-t-8 border-gold relative overflow-hidden">
+         <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/oriental-tiles.png')] scale-150"></div>
+         <h4 className="text-6xl font-traditional text-gold font-black uppercase mb-8 relative z-10">{appData.clanName}</h4>
+         <p className="text-yellow-100 font-serif italic text-2xl relative z-10 mb-12">"Cây có cội, nước có nguồn. Người có tổ, có tông mới có ngày hôm nay."</p>
+         <div className="w-24 h-1 bg-gold mx-auto mb-12 opacity-30"></div>
+         {!isAdmin && <button onClick={() => setShowLogin(true)} className="relative z-10 text-gold/30 text-[10px] font-black uppercase tracking-[0.6em] hover:text-gold transition-colors">🔒 Quản trị dòng họ</button>}
       </footer>
-
-      {editingMember && (
-        <div className="fixed inset-0 bg-black/90 z-[400] flex items-center justify-center p-4 md:p-8 overflow-y-auto backdrop-blur-sm">
-          <div className="bg-white p-8 md:p-12 rounded-[2rem] w-full max-w-4xl shadow-2xl border-4 border-gold/20">
-            <div className="flex flex-col md:flex-row justify-between items-center border-b pb-4 mb-8 gap-4">
-              <h3 className="text-2xl md:text-3xl font-traditional font-bold text-gray-900">Biên tập: {editingMember.name}</h3>
-              <div className="flex bg-gray-100 p-1 rounded-xl">
-                <button onClick={() => setEditingMember({...editingMember, isMale: true})} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest ${editingMember.isMale ? 'bg-primary text-white shadow-md' : 'text-gray-400'}`}>Nam</button>
-                <button onClick={() => setEditingMember({...editingMember, isMale: false})} className={`px-4 md:px-6 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest ${!editingMember.isMale ? 'bg-pink-600 text-white shadow-md' : 'text-gray-400'}`}>Nữ</button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <h4 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-primary bg-gray-100 px-4 py-2 rounded-lg">Thông tin chính</h4>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Họ và tên</label>
-                  <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full border-2 border-gray-50 p-3 md:p-4 rounded-xl focus:border-gold outline-none font-bold" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Năm sinh</label>
-                    <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full border-2 border-gray-50 p-3 md:p-4 rounded-xl focus:border-gold outline-none font-medium" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Năm mất (Âm lịch)</label>
-                    <input type="text" value={editingMember.lunarDeathDate || editingMember.deathDate || ''} onChange={(e) => setEditingMember({...editingMember, lunarDeathDate: e.target.value, deathDate: e.target.value})} className="w-full border-2 border-gray-50 p-3 md:p-4 rounded-xl focus:border-gold outline-none font-medium" />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-6">
-                <h4 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-pink-900 bg-pink-50 px-4 py-2 rounded-lg">Thông tin Vợ / Chồng</h4>
-                <input type="text" value={editingMember.spouseName || ''} onChange={(e) => setEditingMember({...editingMember, spouseName: e.target.value})} className="w-full border-2 border-pink-50 p-3 md:p-4 rounded-xl focus:border-pink-200 outline-none font-bold" placeholder="Họ tên vợ/chồng" />
-                <input type="text" value={editingMember.spouseDeathDate || ''} onChange={(e) => setEditingMember({...editingMember, spouseDeathDate: e.target.value})} className="w-full border-2 border-pink-50 p-3 md:p-4 rounded-xl focus:border-pink-200 outline-none font-medium" placeholder="Ngày mất (Âm lịch)" />
-              </div>
-            </div>
-            <div className="flex flex-col md:flex-row gap-4 mt-8 md:mt-12 pt-8 border-t">
-              <button onClick={() => {
-                const updateNode = (node: FamilyMember): FamilyMember => {
-                  if (node.id === editingMember.id) return editingMember;
-                  if (node.children) return { ...node, children: node.children.map(updateNode) };
-                  return node;
-                };
-                updateData({ familyTree: updateNode(appData.familyTree) });
-                setEditingMember(null);
-                showToast("Đã lưu thay đổi");
-              }} className="bg-primary text-gold px-8 md:px-10 py-3 md:py-4 rounded-2xl font-black uppercase shadow-lg flex-1 text-xs md:text-sm">Lưu thay đổi</button>
-              <button onClick={() => setEditingMember(null)} className="bg-gray-100 text-gray-600 px-8 md:px-10 py-3 md:py-4 rounded-2xl font-black uppercase flex-1 text-xs md:text-sm">Hủy</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingNews && (
-        <div className="fixed inset-0 bg-black/90 z-[400] flex items-center justify-center p-8 overflow-y-auto backdrop-blur-sm">
-          <div className="bg-white p-12 rounded-[2rem] w-full max-w-3xl shadow-2xl border-4 border-gold/20">
-            <h3 className="text-3xl font-traditional font-bold mb-8 text-gray-900">
-              {appData.news.find(n => n.id === editingNews.id) ? "Sửa tin tức" : "Soạn tin mới"}
-            </h3>
-            <div className="space-y-6">
-              <input type="text" value={editingNews.title} onChange={(e) => setEditingNews({...editingNews, title: e.target.value})} className="w-full border-2 border-gray-50 p-4 rounded-xl font-bold text-xl" placeholder="Tiêu đề..." />
-              <textarea value={editingNews.summary} onChange={(e) => setEditingNews({...editingNews, summary: e.target.value})} className="w-full border-2 border-gray-50 p-4 rounded-xl h-24 resize-none" placeholder="Tóm tắt ngắn..." />
-              <textarea value={editingNews.content} onChange={(e) => setEditingNews({...editingNews, content: e.target.value})} className="w-full border-2 border-gray-50 p-4 rounded-xl h-64 resize-none" placeholder="Nội dung chi tiết..." />
-              <input type="text" value={editingNews.imageUrl || ''} onChange={(e) => setEditingNews({...editingNews, imageUrl: e.target.value})} className="w-full border-2 border-gray-50 p-4 rounded-xl" placeholder="Link ảnh..." />
-              <div className="flex gap-4 pt-4">
-                <button onClick={() => {
-                  if (appData.news.find(n => n.id === editingNews.id)) {
-                    updateData({ news: appData.news.map(n => n.id === editingNews.id ? editingNews : n) });
-                  } else {
-                    updateData({ news: [editingNews, ...appData.news] });
-                  }
-                  setEditingNews(null);
-                }} className="bg-primary text-gold px-10 py-4 rounded-2xl font-black uppercase shadow-lg flex-1">Đăng tin</button>
-                <button onClick={() => setEditingNews(null)} className="bg-gray-100 text-gray-600 px-10 py-4 rounded-2xl font-black uppercase flex-1">Hủy</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {newsToDelete && (
-        <div className="fixed inset-0 bg-black/90 z-[500] flex items-center justify-center p-8 backdrop-blur-md">
-          <div className="bg-white p-10 rounded-[2.5rem] border-8 border-gray-900 w-full max-w-md text-center shadow-2xl">
-            <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">⚠️</div>
-            <h3 className="text-3xl font-traditional font-black text-gray-900 mb-4">Xác nhận xóa?</h3>
-            <div className="flex gap-4">
-              <button onClick={() => { updateData({ news: appData.news.filter(n => n.id !== newsToDelete.id) }); setNewsToDelete(null); }} className="flex-1 bg-red-700 text-white py-4 rounded-2xl font-black uppercase">Xác nhận</button>
-              <button onClick={() => setNewsToDelete(null)} className="flex-1 bg-gray-100 text-gray-600 py-4 rounded-2xl font-black uppercase">Hủy</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
