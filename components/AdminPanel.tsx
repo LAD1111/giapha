@@ -1,16 +1,21 @@
 
 import React from 'react';
+import { AppTheme } from '../types';
 
 interface AdminPanelProps {
   cloudLink: string;
+  theme: AppTheme;
   onCloudLinkChange: (link: string) => void;
+  onThemeChange: (theme: AppTheme) => void;
   onExport: () => void;
   onLogout: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   cloudLink, 
+  theme,
   onCloudLinkChange, 
+  onThemeChange,
   onExport, 
   onLogout 
 }) => {
@@ -30,6 +35,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       </div>
       
       <div className="flex flex-wrap items-center gap-3 md:gap-6">
+        <div className="flex bg-white/10 rounded-full p-1 border border-white/10">
+          <button 
+            onClick={() => onThemeChange('tet')}
+            className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${theme === 'tet' ? 'bg-gold text-red-950 shadow-md' : 'text-white/40 hover:text-white'}`}
+          >
+            🧧 Tết
+          </button>
+          <button 
+            onClick={() => onThemeChange('classic')}
+            className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${theme === 'classic' ? 'bg-gray-200 text-black shadow-md' : 'text-white/40 hover:text-white'}`}
+          >
+            📜 Classic
+          </button>
+        </div>
+
         <div className="relative group">
           <input 
             type="text" 
@@ -38,9 +58,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             onChange={(e) => onCloudLinkChange(e.target.value)}
             className="bg-white/5 border border-white/10 rounded-full px-4 py-2 text-[11px] w-48 md:w-80 outline-none focus:bg-white/10 focus:border-gold/50 transition-all placeholder:text-white/20 font-medium" 
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-20 group-hover:opacity-100 transition-opacity">
-            <span title="Dán link Google Doc của bạn và đặt chế độ 'Bất kỳ ai có liên kết đều có thể xem'">ℹ️</span>
-          </div>
         </div>
 
         <button 

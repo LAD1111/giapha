@@ -8,13 +8,18 @@ export enum AppSection {
   EVENTS = 'SỰ KIỆN'
 }
 
+export type AppTheme = 'classic' | 'tet';
+
 export interface FamilyMember {
   id: string;
   name: string;
   generation: number;
   birthDate?: string;
   deathDate?: string;
+  lunarDeathDate?: string;
   spouseName?: string;
+  spouseBirthDate?: string;
+  spouseDeathDate?: string;
   children?: FamilyMember[];
   bio?: string;
   isMale: boolean;
@@ -52,4 +57,5 @@ export interface AppData {
   regulations: string[];
   clanName: string;
   lastUpdated: string;
+  theme?: AppTheme;
 }

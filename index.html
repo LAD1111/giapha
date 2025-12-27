@@ -11,39 +11,39 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Quicksand:wght@300;400;500;700&family=Great+Vibes&family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet" crossorigin="anonymous">
     <style>
       :root {
-        --tet-red: #8b0000;
-        --tet-gold: #ffd700;
-        --soft-yellow: #fdf6e3;
+        --primary-red: #8b0000;
+        --accent-gold: #ffd700;
+        --soft-bg: #fdf6e3;
         --paper-bg: #f9f4e8;
       }
+      
+      .theme-classic {
+        --primary-red: #2d3436;
+        --accent-gold: #b2bec3;
+        --soft-bg: #f1f2f6;
+        --paper-bg: #dfe4ea;
+      }
+
       body {
         font-family: 'Quicksand', sans-serif;
-        background-color: var(--soft-yellow);
+        background-color: var(--soft-bg);
         background-image: url('https://www.transparenttextures.com/patterns/handmade-paper.png');
         margin: 0;
         padding: 0;
         overflow-x: hidden;
+        transition: background-color 0.5s ease;
       }
-      .font-traditional {
-        font-family: 'Playfair Display', serif;
-      }
-      .font-festive {
-        font-family: 'Great Vibes', cursive;
-      }
-      .font-script {
-        font-family: 'Dancing Script', cursive;
-      }
-      .bg-red-traditional {
-        background-color: var(--tet-red);
-      }
-      .text-gold {
-        color: var(--tet-gold);
-      }
-      .border-gold {
-        border-color: var(--tet-gold);
-      }
+
+      .font-traditional { font-family: 'Playfair Display', serif; }
+      .font-festive { font-family: 'Great Vibes', cursive; }
+      .font-script { font-family: 'Dancing Script', cursive; }
       
-      /* Animation cánh hoa rơi */
+      .bg-primary { background-color: var(--primary-red); }
+      .text-primary { color: var(--primary-red); }
+      .text-gold { color: var(--accent-gold); }
+      .border-gold { border-color: var(--accent-gold); }
+      
+      /* Blossom Animation only for Tet theme */
       .blossom {
         position: fixed;
         top: -10%;
@@ -53,20 +53,7 @@
         animation: fall linear forwards;
       }
       @keyframes fall {
-        to {
-          transform: translateY(110vh) rotate(360deg);
-        }
-      }
-
-      /* Lantern Swing */
-      @keyframes swing {
-        0% { transform: rotate(-5deg); }
-        50% { transform: rotate(5deg); }
-        100% { transform: rotate(-5deg); }
-      }
-      .lantern {
-        animation: swing 3s ease-in-out infinite;
-        transform-origin: top center;
+        to { transform: translateY(110vh) rotate(360deg); }
       }
 
       @keyframes fadeIn {
@@ -77,23 +64,18 @@
         animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
       }
 
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: var(--soft-yellow);
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #8b0000;
-        border-radius: 10px;
-      }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: var(--soft-bg); }
+      ::-webkit-scrollbar-thumb { background: var(--primary-red); border-radius: 10px; }
 
-      /* Paper Texture for Chronicles */
       .paper-texture {
         background-color: var(--paper-bg);
         background-image: url('https://www.transparenttextures.com/patterns/rice-paper-2.png');
       }
+
+      /* Classic mode overrides */
+      .theme-classic .blossom { display: none; }
+      .theme-classic header { filter: grayscale(0.5); }
     </style>
     <script type="importmap">
     {
@@ -113,6 +95,7 @@
     <script type="module" src="./index.tsx"></script>
     <script>
       function createBlossom() {
+        if (document.body.classList.contains('theme-classic')) return;
         const container = document.getElementById('blossom-container');
         if (!container) return;
         const blossom = document.createElement('div');
