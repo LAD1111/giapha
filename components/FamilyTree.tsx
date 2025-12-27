@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { FamilyMember } from '../types';
 import * as htmlToImage from 'https://esm.sh/html-to-image';
 
@@ -214,59 +214,84 @@ interface FamilyTreeProps {
 }
 
 const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, onAddChild }) => {
-  const [scale, setScale] = useState(0.7);
+  const [scale, setScale] = useState(0.6);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isPanelOpen, setIsPanelOpen] = useState(false); // Mặc định thu gọn
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   
   const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [startY, setStartY] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
+  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [isExporting, setIsExporting] = useState(false);
-
   const initialPinchDistRef = useRef<number | null>(null);
+
+  // --- Zoom logic optimized ---
+  const handleZoom = useCallback((delta: number, clientX: number, clientY: number) => {
+    if (!containerRef.current) return;
+    
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Position of cursor relative to container
+    const mouseX = clientX - rect.left;
+    const mouseY = clientY - rect.top;
+
+    // Point in content space
+    const contentX = (mouseX + container.scrollLeft) / scale;
+    const contentY = (mouseY + container.scrollTop) / scale;
+
+    setScale(prevScale => {
+      const newScale = Math.min(Math.max(prevScale * (1 + delta), 0.1), 3.0);
+      
+      // Update scroll to keep the content point under the mouse
+      requestAnimationFrame(() => {
+        container.scrollLeft = contentX * newScale - mouseX;
+        container.scrollTop = contentY * newScale - mouseY;
+      });
+      
+      return newScale;
+    });
+  }, [scale]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleWheelEvent = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > 0) {
-        e.preventDefault();
-        const zoomSpeed = 0.0015;
-        const delta = -e.deltaY * zoomSpeed;
-        
-        setScale(prevScale => {
-          const newScale = Math.min(Math.max(prevScale + delta, 0.2), 2.0);
-          
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const contentX = (mouseX + container.scrollLeft) / prevScale;
-            const contentY = (mouseY + container.scrollTop) / prevScale;
-
-            setTimeout(() => {
-              container.scrollLeft = contentX * newScale - mouseX;
-              container.scrollTop = contentY * newScale - mouseY;
-            }, 0);
-          }
-          
-          return newScale;
-        });
-      }
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = -e.deltaY * 0.001;
+      handleZoom(delta, e.clientX, e.clientY);
     };
 
-    container.addEventListener('wheel', handleWheelEvent, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheelEvent);
-  }, [containerRef]);
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel);
+  }, [handleZoom]);
 
+  // --- Pan logic ---
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, input')) return;
+    setIsDragging(true);
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    
+    const dx = e.clientX - lastMousePos.x;
+    const dy = e.clientY - lastMousePos.y;
+    
+    containerRef.current.scrollLeft -= dx;
+    containerRef.current.scrollTop -= dy;
+    
+    setLastMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  // --- Mobile Touch logic ---
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(
@@ -274,8 +299,9 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
         e.touches[0].pageY - e.touches[1].pageY
       );
       initialPinchDistRef.current = dist;
-    } else {
-      onMouseDown(e as unknown as React.MouseEvent);
+    } else if (e.touches.length === 1) {
+      setLastMousePos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setIsDragging(true);
     }
   };
 
@@ -287,14 +313,21 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
         e.touches[0].pageY - e.touches[1].pageY
       );
       
-      const zoomFactor = dist / initialPinchDistRef.current;
-      setScale(prev => {
-        const newScale = Math.min(Math.max(prev * zoomFactor, 0.2), 2.0);
-        return newScale;
-      });
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      
+      const zoomFactor = (dist / initialPinchDistRef.current) - 1;
+      handleZoom(zoomFactor * 0.5, centerX, centerY);
       initialPinchDistRef.current = dist;
-    } else if (e.touches.length === 1) {
-      onMouseMove(e as unknown as React.MouseEvent);
+    } else if (e.touches.length === 1 && isDragging && containerRef.current) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - lastMousePos.x;
+      const dy = touch.clientY - lastMousePos.y;
+      
+      containerRef.current.scrollLeft -= dx;
+      containerRef.current.scrollTop -= dy;
+      
+      setLastMousePos({ x: touch.clientX, y: touch.clientY });
     }
   };
 
@@ -303,56 +336,34 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
     setIsDragging(false);
   };
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleResetView();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleZoomIn = () => setScale(prev => Math.min(prev + 0.1, 2.0));
-  const handleZoomOut = () => setScale(prev => Math.max(prev - 0.1, 0.2));
-  
-  const handleResetView = () => {
-    if (containerRef.current && treeRef.current) {
-      const isMobile = window.innerWidth < 768;
-      setScale(isMobile ? 0.4 : 0.6);
-      
-      const containerWidth = containerRef.current.clientWidth;
-      const treeWidth = treeRef.current.scrollWidth;
-      
-      containerRef.current.scrollLeft = (treeWidth - containerWidth) / 2;
+  // --- View helpers ---
+  const handleResetView = useCallback(() => {
+    if (!containerRef.current || !treeRef.current) return;
+    const isMobile = window.innerWidth < 768;
+    const initialScale = isMobile ? 0.3 : 0.6;
+    setScale(initialScale);
+    
+    setTimeout(() => {
+      if (!containerRef.current || !treeRef.current) return;
+      const cw = containerRef.current.clientWidth;
+      const tw = treeRef.current.offsetWidth * initialScale;
+      containerRef.current.scrollLeft = (tw - cw) / 2;
       containerRef.current.scrollTop = 0;
-    }
-  };
+    }, 50);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(handleResetView, 300);
+    return () => clearTimeout(timer);
+  }, [handleResetView]);
 
   const toggleFullScreen = () => {
     if (!wrapperRef.current) return;
     if (!document.fullscreenElement) {
-      wrapperRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
+      wrapperRef.current.requestFullscreen().catch(err => console.error(err));
     } else {
       document.exitFullscreen();
     }
-  };
-
-  const handleExportJSON = () => {
-    const blob = new Blob([JSON.stringify(root, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `giapha-le-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const handleExportPNG = async () => {
@@ -379,39 +390,10 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
     }
   };
 
-  const onMouseDown = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('.controls-panel')) return;
-    
-    setIsDragging(true);
-    const pageX = 'touches' in e ? (e as unknown as TouchEvent).touches[0].pageX : e.pageX;
-    const pageY = 'touches' in e ? (e as unknown as TouchEvent).touches[0].pageY : e.pageY;
-    
-    setStartX(pageX - containerRef.current.offsetLeft);
-    setStartY(pageY - containerRef.current.offsetTop);
-    setScrollLeft(containerRef.current.scrollLeft);
-    setScrollTop(containerRef.current.scrollTop);
-  };
-
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    
-    const pageX = 'touches' in e ? (e as unknown as TouchEvent).touches[0].pageX : e.pageX;
-    const pageY = 'touches' in e ? (e as unknown as TouchEvent).touches[0].pageY : e.pageY;
-    
-    const x = pageX - containerRef.current.offsetLeft;
-    const y = pageY - containerRef.current.offsetTop;
-    const walkX = (x - startX) * 1.5;
-    const walkY = (y - startY) * 1.5;
-    containerRef.current.scrollLeft = scrollLeft - walkX;
-    containerRef.current.scrollTop = scrollTop - walkY;
-  };
-
   return (
     <div 
       ref={wrapperRef}
-      className={`relative w-full overflow-hidden bg-white/60 backdrop-blur-xl rounded-[2rem] md:rounded-[3rem] border-2 border-red-900/5 shadow-2xl transition-all duration-500 ${isFullscreen ? 'fixed inset-0 z-[1000] rounded-none border-none' : 'h-[70vh] md:min-h-[850px]'} group/canvas flex flex-col`}
+      className={`relative w-full overflow-hidden bg-white/60 backdrop-blur-xl rounded-[2rem] md:rounded-[3rem] border-2 border-red-900/5 shadow-2xl transition-all duration-500 ${isFullscreen ? 'fixed inset-0 z-[1000] rounded-none border-none' : 'h-[70vh] md:min-h-[850px]'} flex flex-col`}
     >
       {isExporting && (
         <div className="fixed inset-0 z-[500] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center animate-fadeIn">
@@ -422,105 +404,72 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
         </div>
       )}
 
-      {/* Bảng điều khiển */}
-      <div className={`controls-panel absolute top-4 right-4 md:top-10 md:right-10 z-50 transition-all duration-500 flex flex-col gap-4 ${isPanelOpen ? 'w-full max-w-[calc(100%-2rem)] md:max-w-md' : 'w-12 h-12'}`}>
-        <div className="flex justify-end gap-2">
-           {/* Nút Toàn màn hình chỉ hiện khi mở panel hoặc ở chế độ desktop */}
-           {(isPanelOpen || window.innerWidth > 768) && (
-             <button 
-              onClick={toggleFullScreen}
-              className={`w-12 h-12 bg-white text-red-950 rounded-full flex items-center justify-center shadow-xl border border-red-900/10 hover:scale-110 active:scale-95 transition-all z-[60] ${!isPanelOpen ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto' : 'opacity-100'}`}
-              title={isFullscreen ? "Thoát toàn màn hình" : "Phóng toàn màn hình"}
-            >
-              {isFullscreen ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9L4 4m0 0l5 0m-5 0l0 5m11 0l5-5m0 0l-5 0m5 0l0 5m-5 11l5 5m0 0l-5 0m5 0l0-5m-11 0l-5 5m0 0l5 0m-5 0l0-5" /></svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-              )}
-            </button>
-           )}
-          <button 
-            onClick={() => setIsPanelOpen(!isPanelOpen)}
-            className={`w-12 h-12 bg-red-950 text-gold rounded-full flex items-center justify-center shadow-2xl transition-all border border-gold/30 hover:scale-110 active:scale-95 z-[60]`}
-            title={isPanelOpen ? "Thu gọn" : "Công cụ"}
-          >
-            {isPanelOpen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-            )}
-          </button>
+      {/* Controls Overlay */}
+      <div className={`controls-panel absolute top-4 right-4 md:top-10 md:right-10 z-50 flex flex-col items-end gap-3`}>
+        <div className="flex gap-2">
+           <button 
+             onClick={toggleFullScreen}
+             className="w-10 h-10 md:w-12 md:h-12 bg-white text-red-950 rounded-full flex items-center justify-center shadow-lg border border-red-900/10 hover:scale-110 active:scale-95 transition-all"
+           >
+             {isFullscreen ? '↙️' : '↗️'}
+           </button>
+           <button 
+             onClick={() => setIsPanelOpen(!isPanelOpen)}
+             className="w-10 h-10 md:w-12 md:h-12 bg-red-950 text-gold rounded-full flex items-center justify-center shadow-lg border border-gold/30 hover:scale-110 active:scale-95 transition-all"
+           >
+             {isPanelOpen ? '✖️' : '⚙️'}
+           </button>
         </div>
 
-        {/* Nội dung bảng điều khiển */}
-        <div className={`bg-white/95 backdrop-blur-2xl shadow-2xl rounded-[2rem] border border-red-900/10 p-4 md:p-8 flex flex-col gap-6 transition-all duration-500 overflow-hidden ${isPanelOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-10 pointer-events-none'}`}>
-          <div className="space-y-3">
-            <h5 className="text-[10px] font-black uppercase text-red-950 tracking-[0.2em]">Tìm kiếm nhanh</h5>
-            <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Tên thành viên..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-red-50/50 border-2 border-red-900/5 focus:border-red-900/20 rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-red-950 outline-none transition-all"
-              />
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-900/40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              </div>
-            </div>
-          </div>
+        {isPanelOpen && (
+          <div className="bg-white/95 backdrop-blur-2xl shadow-2xl rounded-3xl border border-red-900/10 p-5 w-64 md:w-72 flex flex-col gap-5 animate-fadeIn">
+             <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-red-950/40 tracking-widest">Tìm kiếm</label>
+                <input 
+                  type="text" 
+                  placeholder="Nhập tên..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-red-50/50 border-2 border-red-900/5 rounded-xl px-4 py-2 text-sm font-bold text-red-950 outline-none"
+                />
+             </div>
+             
+             <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-red-950/40 tracking-widest">Tỉ lệ: {Math.round(scale * 100)}%</label>
+                <div className="flex gap-2">
+                   <button onClick={() => handleZoom(-0.1, window.innerWidth/2, window.innerHeight/2)} className="flex-1 bg-red-50 text-red-900 py-2 rounded-xl font-bold hover:bg-red-100">-</button>
+                   <button onClick={() => handleZoom(0.1, window.innerWidth/2, window.innerHeight/2)} className="flex-1 bg-red-50 text-red-900 py-2 rounded-xl font-bold hover:bg-red-100">+</button>
+                   <button onClick={handleResetView} className="bg-red-950 text-gold px-4 rounded-xl">⟲</button>
+                </div>
+             </div>
 
-          <div className="space-y-3">
-            <h5 className="text-[10px] font-black uppercase text-red-950 tracking-[0.2em]">Tỉ lệ hiển thị</h5>
-            <div className="flex items-center gap-4 bg-red-950/5 p-2 rounded-2xl">
-              <button onClick={handleZoomOut} className="w-10 h-10 flex items-center justify-center bg-white text-red-900 rounded-xl shadow-md hover:bg-red-50 transition-all active:scale-90">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M20 12H4" /></svg>
-              </button>
-              <div className="flex-1 text-center font-black text-xs text-red-950">{Math.round(scale * 100)}%</div>
-              <button onClick={handleZoomIn} className="w-10 h-10 flex items-center justify-center bg-white text-red-900 rounded-xl shadow-md hover:bg-red-50 transition-all active:scale-90">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
-              </button>
-              <button onClick={handleResetView} className="w-10 h-10 flex items-center justify-center bg-red-900 text-gold rounded-xl shadow-md hover:bg-red-800 transition-all active:scale-90" title="Căn giữa phả đồ">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              </button>
-            </div>
-            <p className="text-[9px] text-gray-400 text-center font-medium italic">Lăn chuột hoặc dùng 2 ngón tay để zoom</p>
+             <button onClick={handleExportPNG} className="w-full bg-primary text-gold py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md">Xuất ảnh PNG</button>
           </div>
-
-          <div className="space-y-3 pt-2 border-t border-red-100">
-            <h5 className="text-[10px] font-black uppercase text-red-950 tracking-[0.2em]">Xuất dữ liệu</h5>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={handleExportPNG} disabled={isExporting} className="bg-red-50 text-red-800 px-4 py-3 rounded-2xl hover:bg-red-100 transition-all flex items-center justify-center gap-2 group font-black text-[10px] uppercase">
-                🖼️ Ảnh PNG
-              </button>
-              <button onClick={handleExportJSON} className="bg-blue-50 text-blue-800 px-4 py-3 rounded-2xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase">
-                💾 Data JSON
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       <div 
         ref={containerRef}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={() => setIsDragging(false)}
-        onMouseLeave={() => setIsDragging(false)}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`w-full flex-1 overflow-auto pt-20 md:pt-32 pb-64 md:pb-96 scrollbar-hide ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isFullscreen ? 'bg-[#fdf6e3]' : ''}`}
+        className={`w-full flex-1 overflow-auto scrollbar-hide select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       >
         <div 
           ref={treeRef}
-          style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}
-          className="inline-block min-w-full px-[100vw] md:px-[150vw]"
+          style={{ 
+            transform: `scale(${scale})`, 
+            transformOrigin: '0 0',
+            width: 'fit-content',
+            minWidth: '100%',
+            padding: '200px 100vw' // Generous padding to allow panning anywhere
+          }}
+          className="relative transition-transform duration-75 ease-out"
         >
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -z-10 opacity-5 pointer-events-none">
-             <span className="text-[200px] md:text-[300px]">🌸</span>
-          </div>
-          
           <div className="flex justify-center w-full">
             <MemberNode 
               member={root} 
@@ -533,15 +482,9 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
         </div>
       </div>
 
-      <div className="bg-white/80 backdrop-blur-md border-t border-red-900/5 px-6 py-3 flex justify-between items-center text-[10px] font-bold text-red-950/40">
-        <div className="flex gap-4">
-          <span>{isFullscreen ? 'Đang ở chế độ Toàn màn hình (Esc để thoát)' : 'Kéo để di chuyển'}</span>
-          <span className="hidden md:inline">•</span>
-          <span className="hidden md:inline">Lăn chuột/2 ngón tay để Zoom</span>
-        </div>
-        <div>
-          Gia Tộc Họ Lê © 2024
-        </div>
+      <div className="bg-white/90 border-t border-red-900/5 px-6 py-2 flex justify-between items-center text-[9px] font-bold text-red-950/30 uppercase tracking-widest">
+        <span>Lăn chuột hoặc Pinch để Zoom • Kéo để di chuyển</span>
+        <span className="hidden md:block">Gia Tộc Họ Lê © 2024</span>
       </div>
     </div>
   );
