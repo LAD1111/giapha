@@ -1,10 +1,11 @@
 
 export enum AppSection {
   NEWS = 'TIN TỨC',
-  CHRONICLES = 'PHẢ KỸ',
   TREE = 'PHẢ ĐỒ',
+  CHRONICLES = 'PHẢ KỸ',
   ANCESTRAL_HOUSE = 'TỪ ĐƯỜNG',
-  REGULATIONS = 'TỘC ƯỚC'
+  REGULATIONS = 'TỘC ƯỚC',
+  EVENTS = 'SỰ KIỆN'
 }
 
 export interface FamilyMember {
@@ -17,7 +18,7 @@ export interface FamilyMember {
   children?: FamilyMember[];
   bio?: string;
   isMale: boolean;
-  parentName?: string; // Tên của cha hoặc mẹ để hiển thị trên phả đồ
+  parentName?: string;
 }
 
 export interface NewsItem {
@@ -29,12 +30,26 @@ export interface NewsItem {
   imageUrl?: string;
 }
 
-export interface AppState {
+export type EventType = 'giỗ' | 'sinh nhật' | 'họp mặt' | 'khác';
+
+export interface EventItem {
+  id: string;
+  title: string;
+  solarDate: string;
+  lunarDateLabel?: string;
+  type: EventType;
+  description?: string;
+}
+
+export interface AppData {
   news: NewsItem[];
   familyTree: FamilyMember;
+  events: EventItem[];
   bannerUrl: string;
   address: string;
   historyText: string;
   ancestralHouseText: string;
   regulations: string[];
+  clanName: string;
+  lastUpdated: string;
 }

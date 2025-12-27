@@ -9,25 +9,33 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ activeSection, onSectionChange }) => {
   return (
-    <div className="flex flex-wrap justify-center gap-4 py-8">
+    <div className="flex flex-wrap justify-center gap-6 py-6">
       {Object.values(AppSection).map((section) => (
         <button
           key={section}
           onClick={() => onSectionChange(section)}
           className={`
-            px-8 py-3 text-lg font-bold transition-all duration-300 transform
-            border-4 border-gold shadow-traditional
+            px-10 py-5 text-sm font-black transition-all duration-500 transform
+            shadow-traditional group relative overflow-hidden
             ${activeSection === section 
-              ? 'bg-red-800 text-yellow-300 scale-110' 
-              : 'bg-white text-red-900 hover:bg-yellow-50'}
-            rounded-lg
+              ? 'bg-red-900 text-gold scale-105 z-10' 
+              : 'bg-white text-red-950 hover:bg-red-50 hover:-translate-y-1'}
+            rounded-2xl border-2 ${activeSection === section ? 'border-gold' : 'border-red-900/5'}
           `}
-          style={{
-            backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.1) 100%)',
-            clipPath: 'polygon(10% 0, 90% 0, 100% 10%, 100% 90%, 90% 100%, 10% 100%, 0 90%, 0 10%)'
-          }}
         >
-          {section}
+          {/* Tết Ornament */}
+          {activeSection === section && (
+            <div className="absolute top-0 right-0 p-1 animate-pulse">
+               <span className="text-[10px]">🌸</span>
+            </div>
+          )}
+          
+          <span className={`relative z-10 uppercase tracking-[0.2em] ${activeSection === section ? 'drop-shadow-sm' : ''}`}>
+            {section}
+          </span>
+          
+          {/* Hover Effect */}
+          <div className={`absolute inset-0 bg-gold transition-transform duration-500 origin-left scale-x-0 group-hover:scale-x-100 opacity-10 -z-10`}></div>
         </button>
       ))}
     </div>

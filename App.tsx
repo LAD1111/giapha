@@ -1,76 +1,75 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSection, FamilyMember, NewsItem } from './types';
+import { AppSection, FamilyMember, NewsItem, EventItem, AppData } from './types';
 import Navigation from './components/Navigation';
 import FamilyTree from './components/FamilyTree';
+import Events from './components/Events';
+import { generateClanHistory } from './services/geminiService';
 import { 
   CLAN_NAME, CLAN_ADDRESS, SAMPLE_NEWS, SAMPLE_FAMILY_TREE 
 } from './constants';
-import { generateClanHistory } from './services/geminiService';
 
 const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<AppSection>(AppSection.TREE);
   const bannerInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
-  
-  // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // States with Persistence
-  const [news, setNews] = useState<NewsItem[]>(() => {
-    const saved = localStorage.getItem('clan_news');
-    return saved ? JSON.parse(saved) : SAMPLE_NEWS;
+  // --- Persistent State Logic ---
+  const [appData, setAppData] = useState<AppData>(() => {
+    const saved = localStorage.getItem('giapha_le_data');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Lỗi đọc dữ liệu cũ", e);
+      }
+    }
+    return {
+      news: SAMPLE_NEWS,
+      familyTree: SAMPLE_FAMILY_TREE,
+      events: [
+        { id: '1', title: 'Giỗ Tổ Dòng Họ', solarDate: '2025-04-10', type: 'giỗ' },
+        { id: '2', title: 'Họp Mặt Đầu Xuân', solarDate: '2025-02-15', type: 'họp mặt' }
+      ],
+      bannerUrl: "https://images.unsplash.com/photo-1577908581023-95245842c8d2?auto=format&fit=crop&q=80&w=2000",
+      address: CLAN_ADDRESS,
+      historyText: "Lịch sử dòng họ Lê là một hành trình dài của sự hiếu học, đoàn kết và cống hiến. Khởi nguồn từ vùng đất linh thiêng, con cháu họ Lê đã không ngừng nỗ lực, đóng góp công sức vào sự nghiệp xây dựng và bảo vệ tổ quốc qua nhiều thế hệ.",
+      ancestralHouseText: "Từ đường là nơi thờ tự linh thiêng, nơi lưu giữ hồn cốt của tổ tiên qua bao thế hệ. Ngôi từ đường được xây dựng trang nghiêm với kiến trúc truyền thống, là điểm tựa tâm linh và nơi hội tụ của con cháu mỗi dịp Tết đến xuân về.",
+      regulations: [
+        "Tôn thờ tổ tiên, hiếu thảo với cha mẹ, giữ gìn đạo đức lối sống lành mạnh.",
+        "Đoàn kết, tương trợ giữa các thành viên trong dòng họ, giúp đỡ nhau lúc khó khăn.",
+        "Khuyến khích và hỗ trợ việc học tập, thành tài của con cháu thế hệ trẻ.",
+        "Giữ gìn và tôn tạo các di sản, từ đường và phần mộ của tổ tiên.",
+        "Tổ chức trang trọng các ngày lễ giỗ, Tết và đại hội dòng họ hàng năm."
+      ],
+      clanName: CLAN_NAME,
+      lastUpdated: new Date().toISOString()
+    };
   });
-  const [familyTree, setFamilyTree] = useState<FamilyMember>(() => {
-    const saved = localStorage.getItem('clan_tree');
-    return saved ? JSON.parse(saved) : SAMPLE_FAMILY_TREE;
-  });
-  const [bannerUrl, setBannerUrl] = useState<string>(() => {
-    return localStorage.getItem('clan_banner') || "https://raw.githubusercontent.com/stackblitz/stackblitz-images/main/clan-banner-bg.jpg";
-  });
-  const [address, setAddress] = useState<string>(() => {
-    return localStorage.getItem('clan_address') || CLAN_ADDRESS;
-  });
-  const [historyText, setHistoryText] = useState<string>(() => {
-    return localStorage.getItem('clan_history') || "Lịch sử dòng họ đang được cập nhật...";
-  });
-  const [ancestralHouseText, setAncestralHouseText] = useState<string>(() => {
-    return localStorage.getItem('clan_house_text') || "Từ đường là nơi thờ tự linh thiêng, nơi lưu giữ hồn cốt của tổ tiên qua bao thế hệ. Ngôi từ đường được xây dựng trang nghiêm, là điểm tựa tâm linh cho con cháu muôn đời.";
-  });
-  const [regulations, setRegulations] = useState<string[]>(() => {
-    const saved = localStorage.getItem('clan_regulations');
-    return saved ? JSON.parse(saved) : [
-      "Luôn giữ gìn và phát huy truyền thống tốt đẹp của dòng họ, tôn trọng các bậc tiền bối, yêu thương đùm bọc con cháu.",
-      "Khuyến khích con cháu thi đua học tập, lao động sản xuất, đóng góp công sức xây dựng quê hương, dòng họ ngày càng giàu đẹp.",
-      "Thực hiện tốt nghĩa vụ công dân, chấp hành pháp luật của Nhà nước và các quy định của địa phương.",
-      "Tham gia đầy đủ các hoạt động của dòng họ, đặc biệt là các ngày giỗ tổ, chạp họ hàng năm.",
-      "Giữ gìn sự đoàn kết nội bộ, giải quyết các mâu thuẫn trên tinh thần hòa giải, trọng tình trọng nghĩa."
-    ];
-  });
+
+  // Sync with LocalStorage whenever appData changes
+  useEffect(() => {
+    localStorage.setItem('giapha_le_data', JSON.stringify(appData));
+  }, [appData]);
 
   // Admin States
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [password, setPassword] = useState('');
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [editingNews, setEditingNews] = useState<NewsItem | null>(null);
   const [isEditingText, setIsEditingText] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
 
-  // Toast Helper
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Sync with LocalStorage
-  useEffect(() => { localStorage.setItem('clan_news', JSON.stringify(news)); }, [news]);
-  useEffect(() => { localStorage.setItem('clan_tree', JSON.stringify(familyTree)); }, [familyTree]);
-  useEffect(() => { localStorage.setItem('clan_banner', bannerUrl); }, [bannerUrl]);
-  useEffect(() => { localStorage.setItem('clan_address', address); }, [address]);
-  useEffect(() => { localStorage.setItem('clan_history', historyText); }, [historyText]);
-  useEffect(() => { localStorage.setItem('clan_house_text', ancestralHouseText); }, [ancestralHouseText]);
-  useEffect(() => { localStorage.setItem('clan_regulations', JSON.stringify(regulations)); }, [regulations]);
+  const updateData = (updates: Partial<AppData>) => {
+    setAppData(prev => ({ ...prev, ...updates, lastUpdated: new Date().toISOString() }));
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,88 +77,54 @@ const App: React.FC = () => {
       setIsAdmin(true);
       setShowLogin(false);
       setPassword('');
-      showToast("Đăng nhập thành công!", "success");
+      showToast("Đã kích hoạt chế độ Quản trị dòng họ", "success");
     } else {
-      showToast("Mật khẩu không chính xác!", "error");
+      showToast("Mật khẩu không đúng!", "error");
     }
   };
 
   const handleLogout = () => {
     setIsAdmin(false);
     setIsEditingText(false);
-    setEditingMember(null);
-    setEditingNews(null);
-    setShowLogin(false);
-    showToast("Đã thoát chế độ quản trị", "info");
+    showToast("Đã thoát chế độ Quản trị", "info");
   };
 
-  const saveAllManually = () => {
-    showToast("Dữ liệu đã được lưu trữ vào bộ nhớ trình duyệt", "success");
-  };
-
-  // Export Full Data to JSON
-  const exportAllData = () => {
-    const fullData = {
-      news,
-      familyTree,
-      bannerUrl,
-      address,
-      historyText,
-      ancestralHouseText,
-      regulations,
-      exportDate: new Date().toISOString(),
-      clanName: CLAN_NAME
-    };
-    const blob = new Blob([JSON.stringify(fullData, null, 2)], { type: 'application/json' });
+  const exportBackup = () => {
+    const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `giapha-full-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `GiaPha_Le_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
-    URL.revokeObjectURL(url);
-    showToast("Đã xuất file lưu trữ dữ liệu thành công!", "success");
+    showToast("Đã tải xuống file lưu trữ an toàn!");
   };
 
-  // Import Full Data from JSON
-  const importAllData = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const importBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const data = JSON.parse(event.target?.result as string);
-        if (data.familyTree) setFamilyTree(data.familyTree);
-        if (data.news) setNews(data.news);
-        if (data.bannerUrl) setBannerUrl(data.bannerUrl);
-        if (data.address) setAddress(data.address);
-        if (data.historyText) setHistoryText(data.historyText);
-        if (data.ancestralHouseText) setAncestralHouseText(data.ancestralHouseText);
-        if (data.regulations) setRegulations(data.regulations);
-        
-        showToast("Đã nhập dữ liệu thành công! Trang sẽ cập nhật ngay.", "success");
+        if (data.familyTree && data.clanName) {
+          setAppData(data);
+          showToast("Khôi phục dữ liệu thành công!", "success");
+        } else {
+          showToast("File dữ liệu không đúng cấu trúc!", "error");
+        }
       } catch (err) {
-        showToast("File không hợp lệ hoặc bị lỗi cấu trúc!", "error");
+        showToast("Lỗi khi đọc file!", "error");
       }
     };
     reader.readAsText(file);
   };
 
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast("Kích thước ảnh quá lớn (tối đa 5MB)", "error");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setBannerUrl(base64String);
-        showToast("Đã cập nhật ảnh bìa", "success");
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleAIGenerate = async () => {
+    setAiLoading(true);
+    const content = await generateClanHistory(appData.clanName, appData.address);
+    updateData({ historyText: content });
+    setAiLoading(false);
+    showToast("Đã hoàn thành Phả kỹ bằng AI", "success");
   };
 
   const saveMember = (e: React.FormEvent) => {
@@ -167,105 +132,66 @@ const App: React.FC = () => {
     if (!editingMember) return;
     const updateNode = (node: FamilyMember): FamilyMember => {
       if (node.id === editingMember.id) return editingMember;
-      if (node.children) {
-        return { ...node, children: node.children.map(updateNode) };
-      }
+      if (node.children) return { ...node, children: node.children.map(updateNode) };
       return node;
     };
-    setFamilyTree(updateNode(familyTree));
+    updateData({ familyTree: updateNode(appData.familyTree) });
     setEditingMember(null);
-    showToast("Đã lưu thông tin thành viên", "success");
-  };
-
-  const saveNews = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingNews) return;
-    
-    setNews(prev => {
-      const exists = prev.find(n => n.id === editingNews.id);
-      if (exists) {
-        return prev.map(n => n.id === editingNews.id ? editingNews : n);
-      } else {
-        return [editingNews, ...prev];
-      }
-    });
-    setEditingNews(null);
-    showToast("Đã lưu bài viết tin tức", "success");
+    showToast("Đã lưu thông tin thành viên");
   };
 
   const addChild = (parent: FamilyMember) => {
-    const newId = `child-${Date.now()}`;
     const newChild: FamilyMember = {
-      id: newId,
+      id: `m-${Date.now()}`,
       name: 'Thành viên mới',
       generation: parent.generation + 1,
       isMale: true,
-      spouseName: '',
       parentName: parent.name
     };
-
     const addNode = (node: FamilyMember): FamilyMember => {
-      if (node.id === parent.id) {
-        return { ...node, children: [...(node.children || []), newChild] };
-      }
+      if (node.id === parent.id) return { ...node, children: [...(node.children || []), newChild] };
       if (node.children) return { ...node, children: node.children.map(addNode) };
       return node;
     };
-    
-    setFamilyTree(addNode(familyTree));
+    updateData({ familyTree: addNode(appData.familyTree) });
     setEditingMember(newChild);
-    showToast("Đã thêm thành viên mới vào nhánh", "success");
-  };
-
-  const deleteMember = (id: string) => {
-    if (id === familyTree.id) {
-      showToast("Không thể xóa Cụ Tổ!", "error");
-      setShowDeleteConfirm(null);
-      return;
-    }
-    
-    const deleteFromNode = (node: FamilyMember): FamilyMember => {
-      if (!node.children) return node;
-      return {
-        ...node,
-        children: node.children.filter(child => child.id !== id).map(deleteFromNode)
-      };
-    };
-    
-    setFamilyTree(deleteFromNode(familyTree));
-    setEditingMember(null);
-    setShowDeleteConfirm(null);
-    showToast("Đã xóa thành viên và các nhánh con", "info");
   };
 
   const renderSection = () => {
     switch (activeSection) {
       case AppSection.NEWS:
         return (
-          <div className="animate-fadeIn">
+          <div className="animate-fadeIn space-y-12">
+            <div className="text-center relative">
+              <h2 className="text-5xl font-traditional text-red-900 font-bold mb-4">Tin Tức & Thông Báo</h2>
+              <div className="h-1.5 w-32 bg-gold mx-auto rounded-full shadow-sm"></div>
+            </div>
             {isAdmin && (
-              <div className="mb-8 flex justify-center">
-                <button onClick={() => setEditingNews({ id: Date.now().toString(), title: '', date: new Date().toLocaleDateString('vi-VN'), summary: '', content: '', imageUrl: 'https://picsum.photos/800/400' })} className="bg-green-700 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:bg-green-800 transition-all flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" /></svg>
-                  Thêm Tin Tức
+              <div className="flex justify-center">
+                <button onClick={() => setEditingNews({ id: Date.now().toString(), title: '', date: new Date().toLocaleDateString('vi-VN'), summary: '', content: '', imageUrl: 'https://picsum.photos/seed/new/800/400' })} className="bg-red-800 text-white px-10 py-4 rounded-full font-black shadow-xl hover:bg-red-950 transition-all flex items-center gap-3 transform hover:scale-105 active:scale-95 border-2 border-gold/30">
+                  <span className="text-xl">✍️</span> Soạn tin mới
                 </button>
               </div>
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {news.map((item) => (
-                <div key={item.id} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gold/20 relative group">
-                  {isAdmin && (
-                    <div className="absolute top-2 right-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => setEditingNews(item)} className="bg-yellow-500 text-white p-2 rounded-full shadow hover:bg-yellow-600 transition-all">Sửa</button>
-                      <button onClick={() => { if(window.confirm("Xóa tin này?")) setNews(news.filter(n => n.id !== item.id)); showToast("Đã xóa tin", "info"); }} className="bg-red-600 text-white p-2 rounded-full shadow hover:bg-red-700 transition-all">Xóa</button>
-                    </div>
-                  )}
-                  <img src={item.imageUrl} alt={item.title} className="w-full h-48 object-cover" />
-                  <div className="p-6">
-                    <span className="text-xs font-bold text-red-600 uppercase tracking-widest">{item.date}</span>
-                    <h3 className="text-xl font-bold text-red-900 mt-2 mb-3">{item.title}</h3>
-                    <p className="text-gray-600 text-sm line-clamp-3">{item.summary}</p>
-                    <button className="mt-4 text-red-800 font-bold hover:underline">Xem chi tiết →</button>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+              {appData.news.map((item) => (
+                <div key={item.id} className="bg-white rounded-3xl shadow-traditional overflow-hidden border border-red-900/5 group hover:shadow-2xl transition-all duration-500">
+                  <div className="h-64 overflow-hidden relative">
+                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" />
+                    {isAdmin && (
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        <button onClick={() => setEditingNews(item)} className="bg-yellow-500 text-white p-2.5 rounded-full shadow-lg hover:bg-yellow-600 transition-colors">✏️</button>
+                        <button onClick={() => { if(confirm("Xóa tin này?")) updateData({ news: appData.news.filter(n => n.id !== item.id) }); }} className="bg-red-600 text-white p-2.5 rounded-full shadow-lg hover:bg-red-700 transition-colors">🗑️</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-8">
+                    <span className="inline-block bg-red-50 text-red-800 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-4">{item.date}</span>
+                    <h3 className="text-2xl font-traditional font-bold text-red-950 mb-4 leading-tight group-hover:text-red-700 transition-colors">{item.title}</h3>
+                    <p className="text-gray-600 text-sm leading-relaxed mb-6 line-clamp-3">{item.summary}</p>
+                    <button className="text-red-800 font-bold hover:gap-4 transition-all flex items-center gap-2 group/btn">
+                      Xem chi tiết <span className="group-hover/btn:translate-x-1 transition-transform">→</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -273,89 +199,166 @@ const App: React.FC = () => {
           </div>
         );
       case AppSection.TREE:
-        return <FamilyTree root={familyTree} isAdmin={isAdmin} onEditMember={setEditingMember} onAddChild={addChild} />;
+        return <FamilyTree root={appData.familyTree} isAdmin={isAdmin} onEditMember={setEditingMember} onAddChild={addChild} />;
       case AppSection.CHRONICLES:
         return (
-          <div className="prose prose-lg max-w-none bg-white p-10 rounded-xl shadow-lg border-2 border-double border-gold animate-fadeIn">
-            <div className="flex justify-between items-center border-b-2 border-gold pb-4 mb-6">
-               <h2 className="text-3xl font-traditional text-red-900 italic m-0">Phả Kỹ Dòng Họ</h2>
-               {isAdmin && (
-                 <button onClick={() => { if(isEditingText) showToast("Đã lưu Phả Kỹ", "success"); setIsEditingText(!isEditingText); }} className={`px-4 py-1 rounded text-sm uppercase transition-all ${isEditingText ? 'bg-green-700 text-white' : 'bg-red-800 text-white hover:bg-red-900'}`}>
-                   {isEditingText ? "Hoàn tất" : "Chỉnh sửa"}
-                 </button>
-               )}
+          <div className="max-w-4xl mx-auto animate-fadeIn">
+            <div className="paper-texture p-12 md:p-20 shadow-2xl rounded-sm border-[24px] border-double border-red-900/10 relative">
+              <div className="absolute top-0 right-0 p-8 opacity-5">
+                 <span className="text-[200px]">📜</span>
+              </div>
+              <div className="relative z-10">
+                <div className="flex justify-between items-center border-b-4 border-red-900/5 pb-10 mb-12">
+                  <h2 className="text-5xl font-traditional text-red-950 italic m-0 font-black">Phả Kỹ Gia Tộc</h2>
+                  {isAdmin && (
+                    <div className="flex gap-4">
+                      <button onClick={handleAIGenerate} disabled={aiLoading} className="bg-gold text-red-950 px-6 py-2 rounded-full font-bold shadow-lg hover:bg-yellow-400 disabled:opacity-50">
+                        {aiLoading ? "Đang soạn..." : "AI Soạn thảo"}
+                      </button>
+                      <button onClick={() => setIsEditingText(!isEditingText)} className={`px-8 py-2 rounded-full font-bold transition-all ${isEditingText ? 'bg-green-700 text-white' : 'bg-red-800 text-white'}`}>
+                        {isEditingText ? "Hoàn tất" : "Biên tập"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {isEditingText ? (
+                  <textarea value={appData.historyText} onChange={(e) => updateData({ historyText: e.target.value })} className="w-full h-[600px] p-10 border-4 border-double border-red-900/10 bg-transparent font-serif text-xl leading-relaxed outline-none focus:bg-white/30 transition-all" />
+                ) : (
+                  <div className="whitespace-pre-wrap leading-loose text-gray-800 font-medium text-xl text-justify font-serif drop-shadow-sm indent-12 first-letter:text-7xl first-letter:font-bold first-letter:text-red-900 first-letter:float-left first-letter:mr-3">
+                    {appData.historyText}
+                  </div>
+                )}
+                <div className="mt-20 text-center flex items-center justify-center gap-8">
+                  <div className="h-px w-20 bg-red-900/20"></div>
+                  <span className="text-red-900/40 text-4xl">⚜️</span>
+                  <div className="h-px w-20 bg-red-900/20"></div>
+                </div>
+              </div>
             </div>
-            {isEditingText && isAdmin ? (
-              <textarea 
-                value={historyText} 
-                onChange={(e) => setHistoryText(e.target.value)}
-                className="w-full h-96 p-4 border-2 border-gold/30 rounded font-sans text-base leading-relaxed focus:border-red-800 outline-none"
-              />
-            ) : (
-              <div className="whitespace-pre-wrap leading-relaxed text-gray-800 font-medium">{historyText}</div>
-            )}
           </div>
         );
       case AppSection.ANCESTRAL_HOUSE:
         return (
-          <div className="bg-white p-8 rounded-xl shadow-lg border border-gold animate-fadeIn">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-traditional text-red-900 m-0">Từ Đường Dòng Họ</h2>
-              {isAdmin && (
-                <button onClick={() => { if(isEditingText) showToast("Đã lưu mô tả Từ Đường", "success"); setIsEditingText(!isEditingText); }} className={`px-4 py-1 rounded text-sm uppercase transition-all ${isEditingText ? 'bg-green-700 text-white' : 'bg-red-800 text-white hover:bg-red-900'}`}>
-                  {isEditingText ? "Hoàn tất" : "Sửa mô tả"}
-                </button>
-              )}
-            </div>
-            <div className="space-y-6">
-              <div className="p-4 bg-red-50/50 rounded-lg border border-red-100">
-                <p className="text-lg"><strong>📍 Địa chỉ từ đường:</strong> {address}</p>
-                {isAdmin && (
-                  <button onClick={() => { const a = prompt('Nhập địa chỉ từ đường mới:', address); if(a) { setAddress(a); showToast("Đã cập nhật địa chỉ", "success"); } }} className="text-xs text-blue-600 underline mt-1 hover:text-blue-800">Thay đổi địa chỉ</button>
-                )}
+          <div className="max-w-5xl mx-auto animate-fadeIn space-y-12">
+            <div className="bg-white rounded-[3rem] shadow-traditional border-4 border-red-900/5 overflow-hidden">
+              <div className="h-[500px] relative group overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1598640845355-668b5550dfb0?auto=format&fit=crop&q=80&w=1600" className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-[2s]" />
+                <div className="absolute inset-0 bg-gradient-to-t from-red-950 via-transparent to-transparent opacity-90"></div>
+                <div className="absolute bottom-0 left-0 p-16 w-full">
+                   <h2 className="text-7xl font-traditional text-white m-0 drop-shadow-2xl font-black">Từ Đường Linh Thiêng</h2>
+                   <div className="flex items-center gap-4 mt-6">
+                      <div className="h-1 w-24 bg-gold"></div>
+                      <p className="text-gold font-bold text-2xl tracking-widest">{appData.address}</p>
+                   </div>
+                </div>
               </div>
-              {isEditingText && isAdmin ? (
-                <textarea 
-                  value={ancestralHouseText} 
-                  onChange={(e) => setAncestralHouseText(e.target.value)}
-                  className="w-full h-64 p-4 border-2 border-gold/30 rounded focus:border-red-800 outline-none text-gray-700 leading-relaxed"
-                  placeholder="Nhập mô tả chi tiết về từ đường dòng họ..."
-                />
-              ) : (
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg italic border-l-4 border-red-900 pl-6 py-2">
-                  {ancestralHouseText}
-                </p>
-              )}
+              <div className="p-16 grid grid-cols-1 lg:grid-cols-3 gap-16">
+                <div className="lg:col-span-2 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-3xl font-traditional text-red-950 font-bold m-0 flex items-center gap-3">
+                      <span className="text-4xl">🏮</span> Giới thiệu Từ đường
+                    </h3>
+                  </div>
+                  {isEditingText ? (
+                    <textarea value={appData.ancestralHouseText} onChange={(e) => updateData({ ancestralHouseText: e.target.value })} className="w-full h-80 p-8 border-4 border-double border-red-100 rounded-3xl bg-red-50/20 focus:bg-white transition-all text-xl outline-none" />
+                  ) : (
+                    <p className="text-gray-700 leading-loose whitespace-pre-wrap text-2xl italic font-medium border-l-12 border-gold/30 pl-12 py-6 bg-red-50/30 rounded-r-3xl">
+                      {appData.ancestralHouseText}
+                    </p>
+                  )}
+                  {isAdmin && (
+                    <button onClick={() => setIsEditingText(!isEditingText)} className="bg-red-900 text-gold px-10 py-3 rounded-full font-black shadow-lg hover:bg-black transition-all">
+                      {isEditingText ? "💾 Lưu thông tin" : "✏️ Chỉnh sửa Từ đường"}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-6">
+                   <div className="bg-red-50 p-8 rounded-[2rem] border-2 border-red-100 space-y-6">
+                      <h4 className="text-sm font-black text-red-900 uppercase tracking-widest border-b border-red-200 pb-4">Nơi hội tụ con cháu</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {[
+                          {icon: '🍱', label: 'Chạp Họ'},
+                          {icon: '🧧', label: 'Tết Xuân'},
+                          {icon: '🏵️', label: 'Thờ Tự'},
+                          {icon: '📜', label: 'Họp Họ'}
+                        ].map((item, idx) => (
+                          <div key={idx} className="bg-white p-4 rounded-2xl shadow-sm text-center transform hover:-translate-y-1 transition-all">
+                            <div className="text-3xl mb-1">{item.icon}</div>
+                            <div className="text-[10px] font-black text-gray-500 uppercase">{item.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                   </div>
+                   <div className="relative h-64 rounded-[2rem] overflow-hidden shadow-xl border-4 border-white">
+                      <img src="https://picsum.photos/seed/altar/400/600" className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                         <span className="text-white font-bold uppercase tracking-widest bg-black/40 backdrop-blur-sm px-4 py-2 rounded-lg">Ảnh tư liệu</span>
+                      </div>
+                   </div>
+                </div>
+              </div>
             </div>
           </div>
         );
       case AppSection.REGULATIONS:
         return (
-          <div className="max-w-4xl mx-auto bg-[#fffdf0] p-12 shadow-2xl rounded-sm border-[16px] border-double border-red-900 relative animate-fadeIn">
-             <div className="flex justify-between items-center mb-10">
-               <div className="w-10"></div>
-               <h2 className="text-4xl font-traditional text-red-900 m-0 uppercase tracking-widest text-center">Tộc Ước Dòng Họ</h2>
-               {isAdmin ? (
-                  <button onClick={() => { if(isEditingText) showToast("Đã lưu Tộc Ước", "success"); setIsEditingText(!isEditingText); }} className={`px-4 py-1 rounded text-xs uppercase transition-all ${isEditingText ? 'bg-green-700 text-white' : 'bg-red-800 text-white hover:bg-red-900'}`}>
-                    {isEditingText ? "Hoàn tất" : "Sửa tộc ước"}
-                  </button>
-               ) : <div className="w-10"></div>}
-             </div>
-             {isEditingText && isAdmin ? (
-               <textarea 
-                 value={regulations.join('\n')}
-                 onChange={(e) => setRegulations(e.target.value.split('\n'))}
-                 className="w-full h-80 p-6 border-4 border-double border-gold/50 bg-white font-serif text-lg leading-loose focus:outline-none"
-               />
-             ) : (
-               <div className="space-y-6 text-lg text-red-950 italic">
-                 {regulations.filter(r => r.trim()).map((reg, idx) => (
-                   <p key={idx}><strong>Điều {idx + 1}:</strong> {reg}</p>
-                 ))}
+          <div className="max-w-4xl mx-auto animate-fadeIn">
+            <div className="bg-[#fffcf0] p-16 md:p-24 shadow-2xl rounded-sm border-[32px] border-double border-red-950 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-48 h-48 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/oriental-tiles.png')]"></div>
+               <div className="absolute bottom-0 right-0 w-48 h-48 opacity-10 rotate-180 bg-[url('https://www.transparenttextures.com/patterns/oriental-tiles.png')]"></div>
+               
+               <div className="relative z-10 text-center space-y-16">
+                 <div className="space-y-6">
+                   <div className="flex items-center justify-center gap-6 text-red-900">
+                      <span className="text-4xl">⚜️</span>
+                      <h2 className="text-6xl font-traditional m-0 uppercase tracking-[0.3em] font-black drop-shadow-md">Tộc Ước</h2>
+                      <span className="text-4xl">⚜️</span>
+                   </div>
+                   <p className="text-red-950 font-traditional italic text-3xl font-bold">Gia Tộc Họ Lê Việt Nam</p>
+                 </div>
+
+                 {isEditingText ? (
+                   <textarea 
+                     value={appData.regulations.join('\n')}
+                     onChange={(e) => updateData({ regulations: e.target.value.split('\n') })}
+                     className="w-full h-[500px] p-12 border-8 border-double border-red-900/20 bg-white/50 font-serif text-2xl leading-relaxed focus:bg-white outline-none transition-all shadow-inner"
+                     placeholder="Mỗi dòng là một điều khoản..."
+                   />
+                 ) : (
+                   <div className="space-y-12 text-left max-w-2xl mx-auto">
+                     {appData.regulations.filter(r => r.trim()).map((reg, idx) => (
+                       <div key={idx} className="flex gap-10 group">
+                         <div className="flex-shrink-0 w-20 h-20 rounded-full bg-red-950 text-gold flex items-center justify-center font-traditional text-3xl font-black shadow-2xl border-4 border-gold group-hover:scale-110 transition-transform duration-500">
+                           {idx + 1}
+                         </div>
+                         <div className="flex-1 pt-4 border-b border-red-900/10 pb-6">
+                           <p className="text-2xl text-red-950 font-bold italic leading-relaxed group-hover:translate-x-2 transition-transform">{reg}</p>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+
+                 <div className="pt-16">
+                   <p className="text-red-900 font-traditional italic text-2xl mb-12">"Duy trì gia phong - Gìn giữ cội nguồn - Vạn đại trường tồn"</p>
+                   {isAdmin && (
+                     <button onClick={() => setIsEditingText(!isEditingText)} className="bg-red-950 text-gold px-12 py-4 rounded-full font-black shadow-2xl hover:bg-black transition-all border-2 border-gold/30">
+                       {isEditingText ? "💾 Lưu Tộc Ước" : "📜 Chỉnh sửa Tộc Ước"}
+                     </button>
+                   )}
+                 </div>
                </div>
-             )}
-             <div className="mt-12 text-center text-sm text-red-800 italic">- Trích lục từ bản gốc lưu tại Từ Đường -</div>
+            </div>
           </div>
+        );
+      case AppSection.EVENTS:
+        return (
+          <Events 
+            events={appData.events} 
+            isAdmin={isAdmin} 
+            onAddEvent={(e) => updateData({ events: [...appData.events, e] })}
+            onDeleteEvent={(id) => updateData({ events: appData.events.filter(e => e.id !== id) })}
+          />
         );
       default:
         return null;
@@ -363,269 +366,238 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20 overflow-x-hidden">
-      {/* Toast Notification */}
+    <div className="min-h-screen pb-32 selection:bg-red-100 selection:text-red-900">
+      {/* Decorative Lanterns */}
+      <div className="fixed top-0 left-12 z-[100] lantern hidden xl:block">
+        <div className="w-1.5 h-24 bg-red-900 mx-auto"></div>
+        <div className="w-20 h-28 bg-red-700 rounded-full border-4 border-gold flex flex-col items-center justify-center shadow-2xl">
+           <div className="text-gold font-black text-xl font-traditional">福</div>
+           <div className="w-12 h-px bg-gold/50 my-1"></div>
+           <div className="text-gold font-bold text-[10px] tracking-widest uppercase">An</div>
+        </div>
+      </div>
+      <div className="fixed top-0 right-12 z-[100] lantern hidden xl:block" style={{ animationDelay: '0.7s' }}>
+        <div className="w-1.5 h-20 bg-red-900 mx-auto"></div>
+        <div className="w-20 h-28 bg-red-700 rounded-full border-4 border-gold flex flex-col items-center justify-center shadow-2xl">
+           <div className="text-gold font-black text-xl font-traditional">祿</div>
+           <div className="w-12 h-px bg-gold/50 my-1"></div>
+           <div className="text-gold font-bold text-[10px] tracking-widest uppercase">Khang</div>
+        </div>
+      </div>
+
+      {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[300] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-fadeIn border-2
-          ${toast.type === 'success' ? 'bg-green-900 border-green-400 text-white' : 
-            toast.type === 'error' ? 'bg-red-950 border-red-400 text-white' : 'bg-blue-900 border-blue-400 text-white'}`}
+        <div className={`fixed bottom-12 left-1/2 -translate-x-1/2 z-[500] px-10 py-5 rounded-full shadow-2xl flex items-center gap-4 animate-fadeIn border-2 backdrop-blur-xl
+          ${toast.type === 'success' ? 'bg-green-900/90 border-green-400 text-white' : 
+            toast.type === 'error' ? 'bg-red-950/90 border-red-400 text-white' : 'bg-blue-900/90 border-blue-400 text-white'}`}
         >
-          {toast.type === 'success' && <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
-          <span className="font-bold tracking-wide">{toast.message}</span>
+          <span className="text-3xl">{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
+          <span className="font-black tracking-wider uppercase text-sm">{toast.message}</span>
         </div>
       )}
 
       {/* Header Banner */}
-      <header className="relative w-full h-[300px] md:h-[500px] flex items-center justify-center bg-cover bg-center shadow-2xl border-b-8 border-gold overflow-hidden">
-        <img src={bannerUrl} alt="Banner" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000" />
+      <header className="relative w-full h-[500px] md:h-[700px] flex items-center justify-center shadow-2xl overflow-hidden bg-black">
+        <img src={appData.bannerUrl} alt="Banner" className="absolute inset-0 w-full h-full object-cover opacity-60 transition-opacity duration-[3s]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-red-900/30 via-transparent to-red-950/80"></div>
         
+        <div className="relative z-10 text-center px-6">
+          <div className="mb-8 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
+             <span className="inline-block bg-red-900/80 backdrop-blur-xl text-gold px-10 py-2 rounded-full text-xs font-black uppercase tracking-[0.5em] border-2 border-gold/30 shadow-2xl">Gìn giữ gia phong - Nối nghiệp tổ tông</span>
+          </div>
+          <h1 className="text-7xl md:text-[10rem] font-traditional text-white font-black mb-6 drop-shadow-[0_10px_30px_rgba(0,0,0,0.8)] animate-fadeIn leading-none" style={{ animationDelay: '0.4s' }}>
+            {appData.clanName}
+          </h1>
+          <p className="text-2xl md:text-5xl font-festive text-gold italic animate-fadeIn drop-shadow-xl" style={{ animationDelay: '0.6s' }}>
+             - Xuân Giáp Thìn 2024 - Vạn Sự Như Ý -
+          </p>
+        </div>
+
         {isAdmin && (
-          <div className="absolute top-4 right-4 z-50 flex gap-2">
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="hidden" 
-              ref={bannerInputRef}
-              onChange={handleBannerUpload}
-            />
-            <button 
-              onClick={() => bannerInputRef.current?.click()}
-              className="bg-black/60 text-white px-4 py-2 rounded-lg border border-gold hover:bg-black transition-all flex items-center gap-2 shadow-lg"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2-2v12a2 2 0 002 2z" />
-              </svg>
-              Thay ảnh bìa
+          <div className="absolute top-12 right-12 z-50 flex gap-4">
+            <input type="file" accept="image/*" className="hidden" ref={bannerInputRef} onChange={(e) => {
+              const file = e.target.files?.[0];
+              if(file) {
+                const reader = new FileReader();
+                reader.onloadend = () => updateData({ bannerUrl: reader.result as string });
+                reader.readAsDataURL(file);
+              }
+            }} />
+            <button onClick={() => bannerInputRef.current?.click()} className="bg-black/60 backdrop-blur-xl text-white px-8 py-4 rounded-full border-2 border-gold/50 hover:bg-gold hover:text-red-950 transition-all flex items-center gap-3 shadow-2xl font-black uppercase text-xs tracking-widest">
+              📷 Cập nhật ảnh nền
             </button>
           </div>
         )}
-
-        <div className="absolute bottom-6 w-full text-center z-10">
-          <div className="inline-block bg-black/40 backdrop-blur-sm px-6 py-2 rounded-full border border-gold/50 shadow-lg">
-            <p className="text-white font-medium flex items-center gap-2">
-              📍 <span className="text-gold font-bold">{address}</span>
-            </p>
-          </div>
-        </div>
       </header>
 
-      {/* Admin Mode Sticky Bar */}
+      {/* Admin Quick Access Bar */}
       {isAdmin && (
-        <div className="bg-red-950 text-gold py-3 px-6 shadow-2xl sticky top-0 z-[100] border-b-2 border-gold/40 flex flex-col md:flex-row justify-between items-center gap-4 backdrop-blur-lg">
-          <div className="flex items-center gap-3">
-            <span className="relative flex h-3 w-3">
+        <div className="bg-red-950 text-gold py-6 px-12 shadow-2xl sticky top-0 z-[100] border-b-2 border-gold/20 flex flex-col md:flex-row justify-between items-center gap-8 backdrop-blur-2xl">
+          <div className="flex items-center gap-6">
+            <div className="relative flex h-5 w-5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-gold"></span>
-            </span>
-            <span className="font-bold uppercase tracking-widest text-sm">Quản trị viên</span>
-            <div className="ml-4 h-4 w-px bg-gold/20"></div>
-            <div className="flex items-center gap-1 text-[10px] text-gold/60 uppercase font-black">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 animate-pulse" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" /></svg>
-              Tự động sao lưu
+              <span className="relative inline-flex rounded-full h-5 w-5 bg-gold shadow-lg"></span>
+            </div>
+            <div className="flex flex-col">
+               <span className="font-black uppercase tracking-[0.3em] text-xs">Phòng Truyền Thống Kỹ Thuật Số</span>
+               <span className="text-[10px] opacity-60 font-bold">Dữ liệu được bảo mật & Lưu trữ tức thì</span>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <input type="file" ref={importInputRef} className="hidden" accept=".json" onChange={importAllData} />
-            <button 
-              onClick={() => importInputRef.current?.click()}
-              className="bg-white/5 text-gold border border-gold/30 px-4 py-1.5 rounded-full hover:bg-gold/10 transition-all text-[10px] font-bold uppercase flex items-center gap-2"
-              title="Nhập dữ liệu từ file lưu trữ"
-            >
-              📥 Nhập dữ liệu
+          <div className="flex items-center gap-6 flex-wrap justify-center">
+            <input type="file" ref={importInputRef} className="hidden" accept=".json" onChange={importBackup} />
+            <button onClick={() => importInputRef.current?.click()} className="bg-white/5 text-gold border border-gold/30 px-6 py-2.5 rounded-full hover:bg-gold/10 transition-all text-[10px] font-black uppercase tracking-widest shadow-inner">
+              📥 Nhập Backup
             </button>
-            <button 
-              onClick={exportAllData}
-              className="bg-white/5 text-gold border border-gold/30 px-4 py-1.5 rounded-full hover:bg-gold/10 transition-all text-[10px] font-bold uppercase flex items-center gap-2"
-              title="Tải về bản sao toàn bộ phả hệ"
-            >
-              📤 Xuất bản sao
+            <button onClick={exportBackup} className="bg-white/5 text-gold border border-gold/30 px-6 py-2.5 rounded-full hover:bg-gold/10 transition-all text-[10px] font-black uppercase tracking-widest shadow-inner">
+              📤 Xuất Backup
             </button>
-            <div className="h-6 w-px bg-gold/20 mx-1"></div>
-            <button 
-              onClick={handleLogout} 
-              className="bg-gold text-red-950 px-6 py-1.5 rounded-full hover:bg-yellow-400 transition-all font-black shadow-lg text-xs uppercase active:scale-95"
-            >
-              Thoát Quản trị
+            <div className="h-10 w-px bg-gold/20 mx-2 hidden md:block"></div>
+            <button onClick={handleLogout} className="bg-gold text-red-950 px-10 py-3 rounded-full hover:bg-yellow-400 transition-all font-black shadow-2xl text-[10px] uppercase tracking-[0.2em] border-2 border-red-900/20">
+              Đóng Quản trị
             </button>
           </div>
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 mt-[-40px] relative z-20">
+      <div className="max-w-7xl mx-auto px-6 mt-[-80px] relative z-20">
         <Navigation activeSection={activeSection} onSectionChange={(s) => { setActiveSection(s); setIsEditingText(false); }} />
-        <main className="mt-8">{renderSection()}</main>
+        <main className="mt-24">{renderSection()}</main>
       </div>
 
-      {/* Login Modal */}
+      {/* Modals & Forms */}
       {showLogin && (
-        <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-white p-8 rounded-xl border-4 border-gold w-full max-w-md shadow-2xl animate-fadeIn">
-            <div className="flex justify-center mb-6">
-              <div className="p-4 bg-red-50 rounded-full border-2 border-red-900/10">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-            </div>
-            <h3 className="text-2xl font-traditional text-red-900 mb-6 text-center">Xác thực Quản trị</h3>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Mật khẩu truy cập (mặc định: admin123)</label>
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  className="w-full border-2 border-gray-100 bg-gray-50 rounded-xl px-4 py-4 focus:border-red-800 focus:bg-white outline-none transition-all shadow-inner text-center text-xl tracking-widest" 
-                  placeholder="••••••••" 
-                  autoFocus 
-                />
-              </div>
-              <div className="flex flex-col gap-3 pt-4">
-                <button type="submit" className="w-full bg-red-900 text-gold font-black py-4 rounded-xl hover:bg-red-950 shadow-xl transition-all uppercase tracking-widest active:scale-[0.98]">
-                  Đăng nhập Hệ thống
-                </button>
-                <button type="button" onClick={() => setShowLogin(false)} className="w-full text-gray-400 font-bold py-2 hover:text-gray-600 transition-all text-sm">
-                  Quay lại trang chủ
-                </button>
-              </div>
-            </form>
+        <div className="fixed inset-0 bg-black/95 z-[300] flex items-center justify-center p-8 backdrop-blur-2xl">
+          <div className="bg-white p-16 rounded-[4rem] border-[12px] border-double border-red-950 w-full max-w-xl shadow-[0_0_150px_rgba(139,0,0,0.4)] animate-fadeIn relative overflow-hidden">
+             <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-gold via-red-800 to-gold"></div>
+             <div className="text-center mb-12">
+                <span className="text-6xl">🔑</span>
+                <h3 className="text-5xl font-traditional text-red-950 mt-6 font-black">Xác Thực Quản Trị</h3>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mt-4">Dành cho trưởng tộc và ban quản lý</p>
+             </div>
+             <form onSubmit={handleLogin} className="space-y-10">
+               <div className="space-y-4">
+                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-red-50/50 border-4 border-red-100 rounded-[2rem] px-10 py-6 focus:border-red-800 focus:bg-white outline-none transition-all text-center text-4xl tracking-[0.8em] font-black shadow-inner" placeholder="••••" autoFocus />
+               </div>
+               <div className="flex flex-col gap-6">
+                 <button type="submit" className="w-full bg-red-950 text-gold font-black py-6 rounded-[2rem] hover:bg-black shadow-2xl transition-all uppercase tracking-[0.3em] text-sm border-2 border-gold/30 transform active:scale-95">
+                   Vào hệ thống quản trị
+                 </button>
+                 <button type="button" onClick={() => setShowLogin(false)} className="text-gray-400 font-bold hover:text-red-800 transition-all text-xs uppercase tracking-widest text-center">
+                   Trở lại trang chủ
+                 </button>
+               </div>
+             </form>
           </div>
         </div>
       )}
 
-      {/* Edit Member Modal */}
+      {/* Member Edit Modal */}
       {editingMember && (
-        <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-white p-8 rounded-xl border-4 border-gold w-full max-w-lg shadow-2xl max-h-[95vh] overflow-y-auto animate-fadeIn relative">
-            
-            {/* Confirmation Overlay for Deletion */}
-            {showDeleteConfirm === editingMember.id && (
-              <div className="absolute inset-0 bg-red-900/95 z-50 rounded-lg flex flex-col items-center justify-center p-8 text-center animate-fadeIn">
-                <div className="bg-white p-4 rounded-full mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+        <div className="fixed inset-0 bg-black/95 z-[300] flex items-center justify-center p-6 backdrop-blur-2xl overflow-y-auto">
+          <div className="bg-white p-12 rounded-[3rem] border-8 border-red-900/5 w-full max-w-3xl shadow-2xl my-12 animate-fadeIn">
+            <div className="flex justify-between items-center mb-12 border-b-2 border-red-100 pb-8">
+               <h3 className="text-4xl font-traditional text-red-950 font-black m-0">🖋️ Cập nhật Thành viên</h3>
+               <button onClick={() => setEditingMember(null)} className="text-gray-300 hover:text-red-800 transition-all text-3xl">✕</button>
+            </div>
+            <form onSubmit={saveMember} className="space-y-10">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-red-900/60 uppercase tracking-widest">Họ và Tên</label>
+                  <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-8 py-5 focus:border-red-800 outline-none font-black text-xl transition-all shadow-sm" required />
                 </div>
-                <h4 className="text-2xl font-bold text-white mb-2 uppercase tracking-wide">Xác Nhận Xóa</h4>
-                <p className="text-red-100 mb-8 leading-relaxed">
-                  Hành động này sẽ xóa vĩnh viễn <span className="font-bold text-white underline">{editingMember.name}</span> và TOÀN BỘ nhánh con cháu liên quan. Bạn có chắc chắn?
-                </p>
-                <div className="flex gap-4 w-full">
-                  <button 
-                    onClick={() => deleteMember(editingMember.id)}
-                    className="flex-1 bg-white text-red-900 font-black py-4 rounded-xl hover:bg-red-50 transition-all shadow-xl active:scale-95"
-                  >
-                    CÓ, XÓA NGAY
-                  </button>
-                  <button 
-                    onClick={() => setShowDeleteConfirm(null)}
-                    className="flex-1 bg-transparent border-2 border-white text-white font-bold py-4 rounded-xl hover:bg-white/10 transition-all active:scale-95"
-                  >
-                    QUAY LẠI
-                  </button>
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-red-900/60 uppercase tracking-widest">Phối Ngẫu (Vợ/Chồng)</label>
+                  <input type="text" value={editingMember.spouseName || ''} onChange={(e) => setEditingMember({...editingMember, spouseName: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-8 py-5 focus:border-red-800 outline-none font-black text-xl transition-all shadow-sm" placeholder="..." />
                 </div>
-              </div>
-            )}
-
-            <h3 className="text-2xl font-traditional text-red-900 mb-6 text-center border-b-2 border-gold pb-2">✏️ Biên tập thành viên</h3>
-            <form onSubmit={saveMember} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Họ và Tên</label>
-                  <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 focus:border-red-800 outline-none" required />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Vợ / Chồng</label>
-                  <input type="text" value={editingMember.spouseName || ''} onChange={(e) => setEditingMember({...editingMember, spouseName: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 focus:border-red-800 outline-none" placeholder="Tên phối ngẫu..." />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Giới tính</label>
-                  <select value={editingMember.isMale ? 'male' : 'female'} onChange={(e) => setEditingMember({...editingMember, isMale: e.target.value === 'male'})} className="w-full border-2 rounded-lg px-4 py-2 focus:border-red-800 outline-none">
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-red-900/60 uppercase tracking-widest">Giới tính</label>
+                  <select value={editingMember.isMale ? 'male' : 'female'} onChange={(e) => setEditingMember({...editingMember, isMale: e.target.value === 'male'})} className="w-full border-4 border-gray-100 rounded-2xl px-8 py-5 focus:border-red-800 outline-none font-black text-xl transition-all appearance-none bg-white shadow-sm">
                     <option value="male">Nam</option>
                     <option value="female">Nữ</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Năm sinh / Ngày mất</label>
-                  <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 focus:border-red-800 outline-none" placeholder="VD: 1950 - 2020" />
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-red-900/60 uppercase tracking-widest">Sinh - Tử</label>
+                  <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-8 py-5 focus:border-red-800 outline-none font-black text-xl transition-all shadow-sm" placeholder="VD: 1945 - 2024" />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Tên Cha/Mẹ (Hiển thị phả đồ)</label>
-                <input type="text" value={editingMember.parentName || ''} onChange={(e) => setEditingMember({...editingMember, parentName: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 focus:border-red-800 outline-none" placeholder="Tên cụ thân sinh..." />
+              <div className="space-y-3">
+                <label className="text-xs font-black text-red-900/60 uppercase tracking-widest">Ghi chú tiểu sử</label>
+                <textarea value={editingMember.bio || ''} onChange={(e) => setEditingMember({...editingMember, bio: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-8 py-5 h-40 focus:border-red-800 outline-none font-medium leading-relaxed shadow-sm" />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Tiểu sử tóm tắt</label>
-                <textarea value={editingMember.bio || ''} onChange={(e) => setEditingMember({...editingMember, bio: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 h-20 focus:border-red-800 outline-none" />
-              </div>
-              <div className="flex flex-col gap-3 pt-4">
-                <button type="submit" className="w-full bg-green-700 text-white font-black py-4 rounded-xl shadow-xl hover:bg-green-800 transition-all active:scale-[0.98]">
-                  CẬP NHẬT THÔNG TIN
-                </button>
-                <div className="flex gap-3">
-                  <button type="button" onClick={() => setShowDeleteConfirm(editingMember.id)} className="flex-1 bg-red-100 text-red-700 font-bold py-3 rounded-xl hover:bg-red-200 transition-all">
-                    XÓA THÀNH VIÊN
-                  </button>
-                  <button type="button" onClick={() => setEditingMember(null)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-200 transition-all">
-                    ĐÓNG
-                  </button>
-                </div>
+              <div className="flex gap-6 pt-10 border-t-2 border-red-50">
+                <button type="submit" className="flex-1 bg-red-950 text-gold font-black py-6 rounded-2xl shadow-2xl hover:bg-black transition-all uppercase tracking-widest border-2 border-gold/30">Lưu Gia Phả</button>
+                <button type="button" onClick={() => setEditingMember(null)} className="px-12 py-6 bg-gray-50 text-gray-400 font-black rounded-2xl hover:bg-gray-100 transition-all uppercase tracking-widest">Đóng</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* News Modal */}
+      {/* News Edit Modal */}
       {editingNews && (
-        <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-white p-8 rounded-xl border-4 border-gold w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto animate-fadeIn">
-            <h3 className="text-2xl font-traditional text-red-900 mb-6 text-center">📰 Biên tập bài viết</h3>
-            <form onSubmit={saveNews} className="space-y-4">
-              <input type="text" value={editingNews.title} onChange={(e) => setEditingNews({...editingNews, title: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 focus:border-red-800 outline-none" placeholder="Tiêu đề bài viết..." required />
-              <textarea value={editingNews.summary} onChange={(e) => setEditingNews({...editingNews, summary: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 h-20 focus:border-red-800 outline-none" placeholder="Tóm tắt nội dung..." required />
-              <textarea value={editingNews.content} onChange={(e) => setEditingNews({...editingNews, content: e.target.value})} className="w-full border-2 rounded-lg px-4 py-2 h-40 focus:border-red-800 outline-none" placeholder="Nội dung chi tiết..." required />
-              <div className="flex gap-4 pt-4">
-                <button type="submit" className="flex-1 bg-green-700 text-white font-bold py-3 rounded-lg shadow-lg">Đăng bài</button>
-                <button type="button" onClick={() => setEditingNews(null)} className="flex-1 bg-gray-100 py-3 rounded-lg">Hủy</button>
+        <div className="fixed inset-0 bg-black/95 z-[300] flex items-center justify-center p-6 backdrop-blur-2xl">
+          <div className="bg-white p-12 rounded-[3rem] border-8 border-red-900/5 w-full max-w-4xl shadow-2xl animate-fadeIn">
+            <h3 className="text-4xl font-traditional text-red-950 font-black mb-12 border-b-2 pb-8">📰 Biên Tập Tin Tức</h3>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if(!editingNews) return;
+              const exists = appData.news.find(n => n.id === editingNews.id);
+              updateData({
+                news: exists 
+                  ? appData.news.map(n => n.id === editingNews.id ? editingNews : n)
+                  : [editingNews, ...appData.news]
+              });
+              setEditingNews(null);
+              showToast("Đã đăng tin thành công");
+            }} className="space-y-8">
+              <input type="text" value={editingNews.title} onChange={(e) => setEditingNews({...editingNews, title: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-10 py-5 focus:border-red-800 outline-none font-black text-2xl shadow-sm" placeholder="Tiêu đề bài viết..." required />
+              <div className="grid grid-cols-2 gap-8">
+                 <input type="text" value={editingNews.date} onChange={(e) => setEditingNews({...editingNews, date: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-10 py-5 focus:border-red-800 outline-none font-bold" placeholder="Ngày đăng..." />
+                 <input type="text" value={editingNews.imageUrl} onChange={(e) => setEditingNews({...editingNews, imageUrl: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-10 py-5 focus:border-red-800 outline-none font-bold" placeholder="URL ảnh minh họa..." />
+              </div>
+              <textarea value={editingNews.summary} onChange={(e) => setEditingNews({...editingNews, summary: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-10 py-5 h-24 focus:border-red-800 outline-none font-medium" placeholder="Tóm tắt ngắn gọn..." required />
+              <textarea value={editingNews.content} onChange={(e) => setEditingNews({...editingNews, content: e.target.value})} className="w-full border-4 border-gray-100 rounded-2xl px-10 py-5 h-64 focus:border-red-800 outline-none font-medium leading-relaxed" placeholder="Nội dung bài viết chi tiết..." required />
+              <div className="flex gap-6 pt-10">
+                <button type="submit" className="flex-1 bg-red-950 text-gold font-black py-6 rounded-2xl shadow-2xl hover:bg-black transition-all uppercase tracking-[0.2em] border-2 border-gold/30">Phát hành thông báo</button>
+                <button type="button" onClick={() => setEditingNews(null)} className="px-12 py-6 bg-gray-50 text-gray-400 font-black rounded-2xl hover:bg-gray-100 transition-all uppercase tracking-widest">Hủy bỏ</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <footer className="mt-20 py-16 bg-[#1a0000] text-yellow-100 border-t-8 border-gold relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-12 items-center relative z-10">
-          <div className="space-y-6">
-            <h4 className="text-3xl font-traditional uppercase text-gold border-l-4 border-gold pl-4">{CLAN_NAME}</h4>
-            <div className="flex flex-col gap-2 opacity-80 text-lg">
-              <p>🏛️ {address}</p>
-              <p>📅 Ngày cập nhật: {new Date().toLocaleDateString('vi-VN')}</p>
+      {/* Footer */}
+      <footer className="mt-48 pt-40 pb-24 bg-red-950 text-yellow-100 border-t-[12px] border-gold relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-gold via-red-800 to-gold opacity-60"></div>
+        <div className="max-w-7xl mx-auto px-12 grid grid-cols-1 lg:grid-cols-2 gap-32 relative z-10">
+          <div className="space-y-12">
+            <h4 className="text-6xl font-traditional uppercase text-gold font-black tracking-[0.2em] drop-shadow-lg">{appData.clanName}</h4>
+            <div className="space-y-6 text-2xl font-medium opacity-90 font-serif">
+              <p className="flex items-center gap-6"><span>🏛️</span> {appData.address}</p>
+              <p className="flex items-center gap-6"><span>📜</span> Truyền thống vạn đại trường tồn</p>
+              <p className="flex items-center gap-6"><span>📅</span> Năm Giáp Thìn - 2024</p>
             </div>
             {!isAdmin && (
-              <button 
-                onClick={() => setShowLogin(true)} 
-                className="mt-8 text-xs text-gold/30 hover:text-gold flex items-center gap-2 transition-all p-2 border border-gold/10 rounded hover:bg-gold/5"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                </svg>
-                QUẢN TRỊ VIÊN ĐĂNG NHẬP
+              <button onClick={() => setShowLogin(true)} className="group bg-white/5 border-2 border-gold/30 px-12 py-5 rounded-[2rem] hover:bg-gold hover:text-red-950 transition-all flex items-center gap-6 shadow-2xl">
+                <span className="bg-gold text-red-950 p-3 rounded-xl text-2xl group-hover:scale-110 transition-transform shadow-lg">🔑</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-gold/60 group-hover:text-red-950 transition-colors leading-relaxed">Đăng nhập Quản trị viên<br/>Hệ thống Gia phả nội bộ</span>
               </button>
             )}
           </div>
-          <div className="text-center md:text-right space-y-4">
-            <p className="text-2xl font-traditional italic text-gold leading-relaxed">"Tổ Tông Công Đức Thiên Niên Thịnh"</p>
-            <p className="text-2xl font-traditional italic text-gold leading-relaxed">"Tử Hiếu Tôn Hiền Vạn Đại Vinh"</p>
+          <div className="text-center lg:text-right flex flex-col justify-center space-y-12">
+            <p className="text-4xl md:text-6xl font-festive text-gold leading-relaxed italic drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">"Tổ Tông Công Đức Thiên Niên Thịnh"</p>
+            <p className="text-4xl md:text-6xl font-festive text-gold leading-relaxed italic drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">"Tử Hiếu Tôn Hiền Vạn Đại Vinh"</p>
           </div>
         </div>
-        <div className="text-center mt-16 text-[10px] opacity-20 border-t border-gold/10 pt-8 tracking-[0.2em] uppercase">
-          &copy; {new Date().getFullYear()} Nền tảng quản trị gia phả Việt Nam - Gìn giữ cội nguồn
+        <div className="text-center mt-40 pt-20 border-t border-gold/10">
+           <p className="text-[10px] opacity-40 tracking-[0.5em] font-black uppercase mb-6">Bản quyền &copy; {new Date().getFullYear()} - {appData.clanName}</p>
+           <div className="flex justify-center gap-6 opacity-30 text-xl">
+              <span>🌸</span><span>🏵️</span><span>🌸</span><span>🏵️</span><span>🌸</span>
+           </div>
         </div>
-      </footer >
+      </footer>
     </div>
   );
 };

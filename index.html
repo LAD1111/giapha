@@ -8,67 +8,91 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Quicksand:wght@300;400;500;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Quicksand:wght@300;400;500;700&family=Great+Vibes&family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet" crossorigin="anonymous">
     <style>
+      :root {
+        --tet-red: #8b0000;
+        --tet-gold: #ffd700;
+        --soft-yellow: #fdf6e3;
+        --paper-bg: #f9f4e8;
+      }
       body {
         font-family: 'Quicksand', sans-serif;
-        background-color: #fdf6e3;
+        background-color: var(--soft-yellow);
         background-image: url('https://www.transparenttextures.com/patterns/handmade-paper.png');
         margin: 0;
         padding: 0;
+        overflow-x: hidden;
       }
       .font-traditional {
         font-family: 'Playfair Display', serif;
       }
+      .font-festive {
+        font-family: 'Great Vibes', cursive;
+      }
+      .font-script {
+        font-family: 'Dancing Script', cursive;
+      }
       .bg-red-traditional {
-        background-color: #8b0000;
+        background-color: var(--tet-red);
       }
       .text-gold {
-        color: #d4af37;
+        color: var(--tet-gold);
       }
       .border-gold {
-        border-color: #d4af37;
+        border-color: var(--tet-gold);
       }
-      .shadow-traditional {
-        box-shadow: 0 4px 15px rgba(139, 0, 0, 0.2);
+      
+      /* Animation cánh hoa rơi */
+      .blossom {
+        position: fixed;
+        top: -10%;
+        z-index: 1000;
+        user-select: none;
+        pointer-events: none;
+        animation: fall linear forwards;
       }
+      @keyframes fall {
+        to {
+          transform: translateY(110vh) rotate(360deg);
+        }
+      }
+
+      /* Lantern Swing */
+      @keyframes swing {
+        0% { transform: rotate(-5deg); }
+        50% { transform: rotate(5deg); }
+        100% { transform: rotate(-5deg); }
+      }
+      .lantern {
+        animation: swing 3s ease-in-out infinite;
+        transform-origin: top center;
+      }
+
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
+        from { opacity: 0; transform: translateY(20px); }
         to { opacity: 1; transform: translateY(0); }
       }
       .animate-fadeIn {
-        animation: fadeIn 0.6s ease-out forwards;
+        animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
       }
-      header::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 100px;
-        background: linear-gradient(to top, rgba(253, 246, 227, 1), transparent);
-        z-index: 5;
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
       }
-      /* Loading Screen */
-      #root:empty {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        background: #fdf6e3;
+      ::-webkit-scrollbar-track {
+        background: var(--soft-yellow);
       }
-      #root:empty::after {
-        content: "Đang tải Gia Phả...";
-        font-family: 'Playfair Display', serif;
-        font-size: 1.5rem;
-        color: #8b0000;
-        font-weight: bold;
-        letter-spacing: 0.1em;
-        animation: pulse 1.5s infinite;
+      ::-webkit-scrollbar-thumb {
+        background: #8b0000;
+        border-radius: 10px;
       }
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+
+      /* Paper Texture for Chronicles */
+      .paper-texture {
+        background-color: var(--paper-bg);
+        background-image: url('https://www.transparenttextures.com/patterns/rice-paper-2.png');
       }
     </style>
     <script type="importmap">
@@ -84,8 +108,24 @@
     </script>
   </head>
   <body>
+    <div id="blossom-container"></div>
     <div id="root"></div>
-    <!-- Thêm script entry point quan trọng để GitHub Pages thực thi code React -->
     <script type="module" src="./index.tsx"></script>
+    <script>
+      function createBlossom() {
+        const container = document.getElementById('blossom-container');
+        if (!container) return;
+        const blossom = document.createElement('div');
+        blossom.className = 'blossom';
+        blossom.innerHTML = Math.random() > 0.5 ? '🌸' : '🏵️';
+        blossom.style.left = Math.random() * 100 + 'vw';
+        blossom.style.fontSize = (Math.random() * 10 + 10) + 'px';
+        blossom.style.animationDuration = (Math.random() * 3 + 5) + 's';
+        blossom.style.opacity = Math.random() * 0.7 + 0.3;
+        container.appendChild(blossom);
+        setTimeout(() => blossom.remove(), 8000);
+      }
+      setInterval(createBlossom, 600);
+    </script>
   </body>
 </html>
