@@ -15,16 +15,17 @@ const App: React.FC = () => {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // --- Persistent State Logic ---
+  // --- Khởi tạo dữ liệu an toàn ---
   const [appData, setAppData] = useState<AppData>(() => {
-    const saved = localStorage.getItem('giapha_le_data');
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem('giapha_le_data');
+      if (saved) {
         return JSON.parse(saved);
-      } catch (e) {
-        console.error("Lỗi đọc dữ liệu cũ", e);
       }
+    } catch (e) {
+      console.warn("Dữ liệu lưu trữ không hợp lệ, đang dùng dữ liệu mẫu.");
     }
+    
     return {
       news: SAMPLE_NEWS,
       familyTree: SAMPLE_FAMILY_TREE,
@@ -48,12 +49,14 @@ const App: React.FC = () => {
     };
   });
 
-  // Sync with LocalStorage whenever appData changes
   useEffect(() => {
-    localStorage.setItem('giapha_le_data', JSON.stringify(appData));
+    try {
+      localStorage.setItem('giapha_le_data', JSON.stringify(appData));
+    } catch (e) {
+      console.error("Không thể lưu dữ liệu vào localStorage", e);
+    }
   }, [appData]);
 
-  // Admin States
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [password, setPassword] = useState('');
