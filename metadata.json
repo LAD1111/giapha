@@ -1,0 +1,8 @@
+{
+  "name": "Hệ Thống Quản Lý Gia Phả Họ",
+  "description": "Một ứng dụng quản lý gia phả truyền thống với giao diện đậm chất văn hóa Việt Nam, hỗ trợ cây phả hệ, tin tức dòng họ, tộc ước và lịch sử dòng họ.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
