@@ -4,19 +4,25 @@ import { AppSection, FamilyMember, NewsItem, EventItem, AppData } from './types'
 import Navigation from './components/Navigation';
 import FamilyTree from './components/FamilyTree';
 import Events from './components/Events';
-import { generateClanHistory } from './services/geminiService';
+import AdminPanel from './components/AdminPanel';
 import { PersistenceService } from './services/persistenceService';
 import { 
   CLAN_NAME, CLAN_ADDRESS, SAMPLE_NEWS, SAMPLE_FAMILY_TREE 
 } from './constants';
 
+const DEFAULT_CLOUD_LINK = "https://docs.google.com/document/d/17fVZaOxx8s-gS3tFE3nj1fdmSJdYWw0mi_ar45TUoQw/edit?usp=sharing";
+
 const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<AppSection>(AppSection.TREE);
-  const bannerInputRef = useRef<HTMLInputElement>(null);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [cloudLink, setCloudLink] = useState<string>(() => localStorage.getItem('cloud_data_link') || '');
+  const [cloudLink, setCloudLink] = useState<string>(() => localStorage.getItem('cloud_data_link') || DEFAULT_CLOUD_LINK);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [password, setPassword] = useState('');
+  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [editingNews, setEditingNews] = useState<NewsItem | null>(null);
+  const [isEditingText, setIsEditingText] = useState(false);
 
   // --- Khởi tạo dữ liệu ---
   const [appData, setAppData] = useState<AppData>(() => {
@@ -45,13 +51,29 @@ const App: React.FC = () => {
     };
   });
 
+  // Tự động đồng bộ khi mở Web
+  useEffect(() => {
+    const autoSync = async () => {
+      setIsSyncing(true);
+      const data = await PersistenceService.fetchFromCloud(cloudLink);
+      if (data) {
+        setAppData(data);
+        showToast("Đã tự động cập nhật dữ liệu từ Cloud", "success");
+      } else {
+        showToast("Sử dụng dữ liệu tạm thời (Không thể tải từ Cloud)", "info");
+      }
+      setIsSyncing(false);
+    };
+    autoSync();
+  }, []);
+
   useEffect(() => {
     PersistenceService.saveLocal(appData);
   }, [appData]);
 
   const handleSync = async () => {
     if (!cloudLink) {
-      showToast("Vui lòng cấu hình Link trực tiếp từ Google Drive!", "info");
+      showToast("Vui lòng cung cấp link Google Doc!", "info");
       return;
     }
     setIsSyncing(true);
@@ -60,22 +82,14 @@ const App: React.FC = () => {
       setAppData(cloudData);
       showToast("Đồng bộ dữ liệu thành công!", "success");
     } else {
-      showToast("Lỗi đồng bộ. Hãy kiểm tra lại Direct Link!", "error");
+      showToast("Lỗi đồng bộ. Hãy đảm bảo Google Doc ở chế độ Công Khai!", "error");
     }
     setIsSyncing(false);
   };
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [password, setPassword] = useState('');
-  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
-  const [editingNews, setEditingNews] = useState<NewsItem | null>(null);
-  const [isEditingText, setIsEditingText] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const updateData = (updates: Partial<AppData>) => {
@@ -95,13 +109,26 @@ const App: React.FC = () => {
   };
 
   const exportBackup = () => {
-    const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `GiaPha_Data_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    showToast("Đã xuất file. Hãy tải lên Google Drive của bạn!");
+    const jsonString = JSON.stringify(appData, null, 2);
+    // Sao chép vào clipboard để người dùng dán vào Google Doc
+    navigator.clipboard.writeText(jsonString).then(() => {
+      showToast("Đã sao chép JSON! Hãy dán (Ctrl+V) vào Google Doc của bạn.", "success");
+      
+      // Đồng thời tải file về như một phương án backup phụ
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `GiaPha_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+    }).catch(err => {
+      showToast("Lỗi sao chép, vui lòng tải file backup bên dưới.", "error");
+    });
+  };
+
+  const handleCloudLinkChange = (link: string) => {
+    setCloudLink(link);
+    localStorage.setItem('cloud_data_link', link);
   };
 
   const renderSection = () => {
@@ -232,48 +259,37 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-32">
-      {/* Sync Banner */}
-      <div className="bg-red-950 text-gold text-[10px] py-1 text-center font-bold tracking-[0.3em] uppercase">
-         Hệ thống quản lý gia phả dòng họ trực tuyến - Dữ liệu đồng bộ đám mây
+      {isAdmin && (
+        <AdminPanel 
+          cloudLink={cloudLink} 
+          onCloudLinkChange={handleCloudLinkChange} 
+          onExport={exportBackup} 
+          onLogout={() => setIsAdmin(false)} 
+        />
+      )}
+
+      <div className="bg-red-950 text-gold text-[10px] py-1.5 text-center font-black tracking-[0.4em] uppercase border-b border-gold/20">
+         Gia Phả Trực Tuyến - {appData.clanName} - Đồng bộ Google Docs
       </div>
 
       <header className="relative w-full h-[600px] flex items-center justify-center bg-black overflow-hidden shadow-2xl">
-        <img src={appData.bannerUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+        <img src={appData.bannerUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Clan Banner" />
         <div className="relative z-10 text-center">
           <h1 className="text-8xl md:text-[10rem] font-traditional text-white font-black drop-shadow-2xl">{appData.clanName}</h1>
           <p className="text-4xl font-festive text-gold italic mt-4">Vạn Đại Trường Tồn</p>
         </div>
         
         <div className="absolute bottom-10 right-10 flex gap-4">
-           <button onClick={handleSync} disabled={isSyncing} className="bg-gold/90 text-red-950 px-6 py-3 rounded-full font-black text-xs uppercase flex items-center gap-2 hover:bg-white transition-all">
-             {isSyncing ? "⌛ Đang tải..." : "🔄 Đồng bộ từ Cloud"}
+           <button 
+             onClick={handleSync} 
+             disabled={isSyncing} 
+             className="bg-gold/90 text-red-950 px-6 py-3 rounded-full font-black text-xs uppercase flex items-center gap-2 hover:bg-white transition-all shadow-xl active:scale-95 disabled:opacity-50"
+             title="Cập nhật dữ liệu mới nhất từ Google Doc"
+           >
+             {isSyncing ? "⌛ Đang tải..." : "🔄 Cập nhật từ Google Doc"}
            </button>
         </div>
       </header>
-
-      {/* Admin Panel */}
-      {isAdmin && (
-        <div className="sticky top-0 z-[100] bg-red-950 text-white p-4 shadow-2xl flex justify-between items-center px-12 border-b-2 border-gold/30">
-          <div className="flex items-center gap-4">
-            <span className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="font-black text-xs uppercase tracking-widest">Chế độ Quản trị viên</span>
-          </div>
-          <div className="flex gap-4">
-            <input 
-              type="text" 
-              placeholder="Nhập Direct Link JSON..." 
-              value={cloudLink} 
-              onChange={(e) => {
-                setCloudLink(e.target.value);
-                localStorage.setItem('cloud_data_link', e.target.value);
-              }}
-              className="bg-white/10 border border-white/20 rounded-full px-4 py-1 text-xs w-64 outline-none focus:bg-white/20" 
-            />
-            <button onClick={exportBackup} className="text-[10px] font-black uppercase tracking-widest bg-white/10 px-4 py-2 rounded-full hover:bg-gold hover:text-red-950">Xuất Backup</button>
-            <button onClick={() => setIsAdmin(false)} className="bg-gold text-red-950 px-6 py-2 rounded-full font-black text-[10px] uppercase">Thoát</button>
-          </div>
-        </div>
-      )}
 
       <div className="max-w-7xl mx-auto px-6 mt-[-60px] relative z-20">
         <Navigation activeSection={activeSection} onSectionChange={setActiveSection} />
@@ -283,14 +299,33 @@ const App: React.FC = () => {
       {/* Login Modal */}
       {showLogin && (
         <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-8 backdrop-blur-md">
-           <div className="bg-white p-12 rounded-[3rem] border-8 border-red-950 w-full max-w-md text-center">
+           <div className="bg-white p-12 rounded-[3rem] border-8 border-red-950 w-full max-w-md text-center shadow-2xl">
               <h3 className="text-4xl font-traditional font-black text-red-950 mb-8">Quản Trị Viên</h3>
               <form onSubmit={handleLogin} className="space-y-6">
-                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border-4 border-red-100 rounded-2xl p-4 text-center text-2xl font-black" placeholder="••••" />
-                 <button type="submit" className="w-full bg-red-950 text-gold py-4 rounded-2xl font-black uppercase">Đăng nhập</button>
-                 <button type="button" onClick={() => setShowLogin(false)} className="text-gray-400 text-xs font-bold uppercase">Quay lại</button>
+                 <input 
+                   type="password" 
+                   value={password} 
+                   onChange={(e) => setPassword(e.target.value)} 
+                   className="w-full border-4 border-red-100 rounded-2xl p-4 text-center text-2xl font-black focus:border-red-800 outline-none transition-all" 
+                   placeholder="••••" 
+                   autoFocus
+                 />
+                 <button type="submit" className="w-full bg-red-950 text-gold py-4 rounded-2xl font-black uppercase hover:bg-red-800 transition-all shadow-lg active:scale-95">Đăng nhập</button>
+                 <button type="button" onClick={() => setShowLogin(false)} className="text-gray-400 text-xs font-bold uppercase hover:text-red-800">Quay lại</button>
               </form>
            </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-10 right-10 z-[500] px-8 py-4 rounded-2xl font-bold shadow-2xl animate-fadeIn flex items-center gap-3 border-2 ${
+          toast.type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 
+          toast.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 
+          'bg-blue-50 text-blue-800 border-blue-200'
+        }`}>
+          <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
+          {toast.message}
         </div>
       )}
 
@@ -304,15 +339,21 @@ const App: React.FC = () => {
          )}
       </footer>
 
-      {/* Member Edit Modal Placeholder (Nếu editingMember tồn tại) */}
+      {/* Member Edit Modal */}
       {editingMember && (
-        <div className="fixed inset-0 bg-black/90 z-[400] flex items-center justify-center p-8 overflow-y-auto">
-          <div className="bg-white p-12 rounded-[2rem] w-full max-w-2xl">
-            <h3 className="text-3xl font-traditional font-bold mb-8">Sửa thông tin: {editingMember.name}</h3>
-            <div className="space-y-4">
-              <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full border p-4 rounded-xl" placeholder="Họ tên" />
-              <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full border p-4 rounded-xl" placeholder="Năm sinh - Năm mất" />
-              <div className="flex gap-4">
+        <div className="fixed inset-0 bg-black/90 z-[400] flex items-center justify-center p-8 overflow-y-auto backdrop-blur-sm">
+          <div className="bg-white p-12 rounded-[2rem] w-full max-w-2xl shadow-2xl border-4 border-gold/20">
+            <h3 className="text-3xl font-traditional font-bold mb-8 text-red-950">Chỉnh sửa: {editingMember.name}</h3>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Họ và tên</label>
+                <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full border-2 border-red-50 p-4 rounded-xl focus:border-red-200 outline-none font-bold" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Năm sinh - Năm mất (Dương lịch)</label>
+                <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full border-2 border-red-50 p-4 rounded-xl focus:border-red-200 outline-none font-medium" placeholder="Ví dụ: 1950 - 2020" />
+              </div>
+              <div className="flex gap-4 pt-4">
                 <button onClick={() => {
                   const updateNode = (node: FamilyMember): FamilyMember => {
                     if (node.id === editingMember.id) return editingMember;
@@ -321,8 +362,9 @@ const App: React.FC = () => {
                   };
                   updateData({ familyTree: updateNode(appData.familyTree) });
                   setEditingMember(null);
-                }} className="bg-red-950 text-gold px-8 py-4 rounded-xl font-bold flex-1">Lưu</button>
-                <button onClick={() => setEditingMember(null)} className="bg-gray-100 px-8 py-4 rounded-xl font-bold">Hủy</button>
+                  showToast("Đã lưu vào bộ nhớ tạm");
+                }} className="bg-red-950 text-gold px-10 py-4 rounded-2xl font-black uppercase shadow-lg hover:bg-red-800 transition-all flex-1">Lưu tạm</button>
+                <button onClick={() => setEditingMember(null)} className="bg-gray-100 text-gray-600 px-10 py-4 rounded-2xl font-black uppercase hover:bg-gray-200 transition-all">Hủy</button>
               </div>
             </div>
           </div>

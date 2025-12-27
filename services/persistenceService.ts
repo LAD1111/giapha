@@ -1,9 +1,6 @@
 
 import { AppData } from '../types';
 
-// URL mặc định hoặc người dùng có thể cấu hình trong UI
-const DEFAULT_DATA_URL = "https://drive.google.com/drive/folders/1XU-B-zFLjhCA3dwJtSplnkuI6vCxaxOL";
-
 export const PersistenceService = {
   saveLocal: (data: AppData) => {
     try {
@@ -22,14 +19,29 @@ export const PersistenceService = {
     }
   },
 
-  // Hàm giả lập việc fetch dữ liệu từ link được chỉ định
-  // Trong thực tế, người dùng cần cung cấp Direct Link của file JSON trong thư mục GDrive
-  fetchFromCloud: async (directLink: string): Promise<AppData | null> => {
+  /**
+   * Chuyển đổi link Google Doc thông thường sang link export text/plain
+   */
+  convertGoogleDocUrl: (url: string): string => {
+    if (url.includes('docs.google.com/document/d/')) {
+      const matches = url.match(/\/d\/(.+?)\//);
+      if (matches && matches[1]) {
+        return `https://docs.google.com/document/d/${matches[1]}/export?format=txt`;
+      }
+    }
+    return url;
+  },
+
+  fetchFromCloud: async (url: string): Promise<AppData | null> => {
     try {
-      const response = await fetch(directLink);
-      if (!response.ok) throw new Error("Không thể kết nối link dữ liệu");
-      const data = await response.json();
-      return data;
+      const fetchUrl = PersistenceService.convertGoogleDocUrl(url);
+      const response = await fetch(fetchUrl);
+      if (!response.ok) throw new Error("Không thể tải dữ liệu từ Cloud. Hãy kiểm tra quyền chia sẻ của Google Doc.");
+      
+      const text = await response.text();
+      // Loại bỏ các ký tự ẩn thường có trong export của Google Doc (BOM, v.v.)
+      const cleanJson = text.trim().replace(/^\uFEFF/, '');
+      return JSON.parse(cleanJson);
     } catch (e) {
       console.error("Lỗi đồng bộ đám mây:", e);
       return null;
