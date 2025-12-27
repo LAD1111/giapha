@@ -25,16 +25,6 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
     return list;
   }, [member.spouses, member.spouseName, member.spouseDeathDate]);
 
-  // Find other parent name for visualization
-  const otherParentName = useMemo(() => {
-    if (!member.otherParentId) return null;
-    // We need to look at the parent's spouses, but since we are at the child node, 
-    // the parent object isn't directly passed here. 
-    // This is a limitation of the current prop structure.
-    // For now, we will assume it's stored in a way we can reference if we passed the parent.
-    return null; 
-  }, [member.otherParentId]);
-
   const containsMatch = useMemo(() => {
     if (!searchQuery) return false;
     const q = searchQuery.toLowerCase();
@@ -62,7 +52,6 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
 
   const isCompact = member.generation >= 4;
   const isGen1To2 = member.generation === 1;
-
   const isNameMatched = searchQuery && member.name.toLowerCase().includes(searchQuery.toLowerCase());
 
   const renderVerticalName = (name: string) => {
@@ -76,10 +65,12 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
     : (isGen1To2 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl');
 
   return (
-    <div className="flex flex-col items-center transition-all duration-500 w-full">
-      <div className="relative group flex flex-col items-center justify-center">
-        <div className="flex flex-row items-start gap-2 relative z-10">
-          {/* Main Member Node */}
+    <div className="flex flex-col items-center transition-all duration-500">
+      {/* Container cho cụ thân sinh và các phối ngẫu */}
+      <div className="flex flex-row items-start justify-center relative z-10">
+        
+        {/* Cột Chính: Người Nam (Cha) */}
+        <div className="flex flex-col items-center relative">
           <div className={`
             relative transition-all duration-500 transform 
             ${isCompact 
@@ -109,7 +100,7 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
                 </button>
                 {!isGen1To2 && (
                   <button 
-                    onClick={(e) => { e.stopPropagation(); if(confirm(`Xóa ${member.name} và toàn bộ con cháu của người này khỏi phả đồ?`)) onDelete?.(member.id); }}
+                    onClick={(e) => { e.stopPropagation(); if(confirm(`Xóa ${member.name}?`)) onDelete?.(member.id); }}
                     className={`bg-red-600 text-white rounded-full p-2 shadow-xl hover:bg-red-700 ${isCompact ? 'scale-75' : ''}`}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
@@ -155,7 +146,28 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
             )}
           </div>
 
-          {/* Multiple Spouses */}
+          {/* Nút bấm thu gọn & Đường kẻ đi xuống bắt nguồn từ cha */}
+          {hasChildren && (
+            <div className="relative w-full flex flex-col items-center">
+              <button
+                onClick={toggleExpand}
+                className={`
+                  absolute top-[-8px] md:top-[-12px] z-20 w-8 h-8 rounded-full border-2 shadow-2xl flex items-center justify-center transition-all duration-300
+                  ${isExpanded ? 'bg-red-950 border-gold text-gold rotate-0' : 'bg-gold border-red-950 text-red-950 rotate-180'}
+                `}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
+              </button>
+              
+              {isExpanded && (
+                <div className={`absolute top-[20px] bg-red-900/20 -z-10 w-[4px] h-[28px] md:h-[36px] ${isGen1To2 ? 'w-[6px] bg-red-900/40' : ''}`} />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Cột Phụ: Các Bà (Vợ) - Hiển thị bên cạnh nhưng không có đường kẻ đi xuống trực tiếp từ ô này */}
+        <div className="flex flex-row items-start gap-2 ml-2">
           {allSpouses.map((spouse, idx) => {
             const isSpouseMatched = searchQuery && spouse.name?.toLowerCase().includes(searchQuery.toLowerCase());
             return (
@@ -180,7 +192,7 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
                     <div className="text-[8px] md:text-[9px] text-pink-900/60 font-black uppercase tracking-[0.2em]">Vợ / Chồng {allSpouses.length > 1 ? idx + 1 : ''}</div>
                     {spouse.deathDate && (
                       <div className="text-[8px] md:text-[9px] text-pink-700/60 font-bold mt-1">
-                        Mất: {spouse.deathDate} (ÂL)
+                        Giỗ: {spouse.deathDate} (ÂL)
                       </div>
                     )}
                   </div>
@@ -189,48 +201,37 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
             );
           })}
         </div>
-
-        {hasChildren && (
-          <button
-            onClick={toggleExpand}
-            className={`
-              absolute left-1/2 -translate-x-1/2 z-20 w-8 h-8 rounded-full border-2 shadow-2xl flex items-center justify-center transition-all duration-300
-              ${isCompact ? '-bottom-5 scale-90' : '-bottom-4'}
-              ${isExpanded ? 'bg-red-950 border-gold text-gold rotate-0' : 'bg-gold border-red-950 text-red-950 rotate-180'}
-            `}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" /></svg>
-          </button>
-        )}
       </div>
       
+      {/* Khối Hiển Thị Con Cái */}
       {hasChildren && isExpanded && (
-        <div className="relative mt-12 md:mt-16 animate-fadeIn w-full flex flex-col items-center">
-          <div className={`absolute top-[-48px] md:top-[-64px] left-1/2 -translate-x-1/2 bg-red-900/20 -z-10 w-[4px] h-[48px] md:h-[64px] ${isGen1To2 ? 'w-[6px] bg-red-900/40' : ''}`} />
-          
+        <div className="relative mt-12 md:mt-12 animate-fadeIn w-full flex flex-col items-center">
+          {/* Căn chỉnh khối con cái bắt đầu từ dưới "đường kẻ cha" */}
           <div className="flex flex-row justify-center relative w-full pt-0">
              {member.children?.map((child, index) => {
                 const isFirst = index === 0;
                 const isLast = index === (member.children?.length ?? 0) - 1;
                 const childIsCompact = child.generation >= 4;
                 
-                // Extract current parent spouse for visual label
+                // Lấy thông tin bà mẹ (nếu có)
                 const motherSpouse = allSpouses.find(s => s.id === child.otherParentId);
                 
                 return (
                   <div key={child.id} className={`relative flex flex-col items-center flex-1 ${childIsCompact ? 'px-1' : 'px-4 md:px-6'}`}>
+                     {/* Đường ngang kết nối các con */}
                      {member.children && member.children.length > 1 && (
                         <div className={`
                           absolute top-0 h-[4px] bg-red-900/20
                           ${isFirst ? 'left-1/2 right-0' : isLast ? 'left-0 right-1/2' : 'left-0 right-0'}
                         `}></div>
                      )}
+                     {/* Đường dọc từ đường ngang xuống từng ô con */}
                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[4px] h-6 md:h-8 bg-red-900/20 -z-10"></div>
                      
-                     {/* Spouse Branch Label */}
+                     {/* Ghi chú: Con của bà nào */}
                      {motherSpouse && !childIsCompact && (
                        <div className="absolute top-1 left-1/2 -translate-x-1/2 bg-pink-100/80 text-pink-800 text-[6px] md:text-[8px] font-black uppercase px-2 py-0.5 rounded-full z-10 border border-pink-200 shadow-sm whitespace-nowrap">
-                         Bà {motherSpouse.name || '?'}
+                         Mẹ: {motherSpouse.name || '?'}
                        </div>
                      )}
 
@@ -462,8 +463,8 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
         </div>
       </div>
       <div className="bg-white/90 border-t border-red-900/5 px-6 py-2 flex justify-between items-center text-[9px] font-bold text-red-950/30 uppercase tracking-widest">
-        <span>Lăn chuột hoặc Pinch để Zoom • Kéo để di chuyển • Xoá thành viên (Admin)</span>
-        <span className="hidden md:block">Gia Tộc Họ Lê © 2024</span>
+        <span>Lăn chuột hoặc Pinch để Zoom • Kéo để di chuyển • Nhánh con luôn bắt đầu từ phía cha</span>
+        <span className="hidden md:block">Hệ Thống Gia Phả Số © 2024</span>
       </div>
     </div>
   );

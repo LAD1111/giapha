@@ -13,8 +13,7 @@ import {
 const DEFAULT_CLOUD_LINK = "https://docs.google.com/document/d/17fVZaOxx8s-gS3tFE3nj1fdmSJdYWw0mi_ar45TUoQw/edit?usp=sharing";
 
 const App: React.FC = () => {
-  // Mặc định vào mục SỰ KIỆN khi truy cập
-  const [activeSection, setActiveSection] = useState<AppSection>(AppSection.EVENTS);
+  const [activeSection, setActiveSection] = useState<AppSection>(AppSection.TREE);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [cloudLink, setCloudLink] = useState<string>(() => localStorage.getItem('cloud_data_link') || DEFAULT_CLOUD_LINK);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -36,9 +35,15 @@ const App: React.FC = () => {
       events: [{ id: 'e1', title: 'Họp Mặt Đầu Xuân', solarDate: '2025-02-15', type: 'họp mặt' }],
       bannerUrl: "https://images.unsplash.com/photo-1577908581023-95245842c8d2?auto=format&fit=crop&q=80&w=2000",
       address: CLAN_ADDRESS,
-      historyText: "Lịch sử dòng họ Lê là một hành trình dài...",
-      ancestralHouseText: "Từ đường là nơi thờ tự linh thiêng...",
-      regulations: ["Tôn thờ tổ tiên...", "Đoàn kết..."],
+      historyText: "Lịch sử dòng họ Lê là một hành trình dài của sự hiếu học, đoàn kết và cống hiến. Khởi nguồn từ vùng đất linh thiêng, con cháu họ Lê đã không ngừng nỗ lực, đóng góp công sức vào sự nghiệp xây dựng và bảo vệ tổ quốc qua nhiều thế hệ.",
+      ancestralHouseText: "Từ đường dòng họ là nơi thờ phụng linh thiêng của toàn thể con cháu nội ngoại. Đây không chỉ là công trình kiến trúc tâm linh mà còn là nơi lưu giữ những giá trị văn hóa, truyền thống tốt đẹp của cha ông. Mỗi dịp lễ tết, con cháu lại tề tựu đông đủ để thắp nén tâm nhang, tỏ lòng hiếu kính và cầu mong tổ tiên phù hộ độ trì cho dòng họ mãi mãi hưng thịnh.",
+      regulations: [
+        "Tôn thờ tổ tiên, giữ gìn nếp nhà, phát huy truyền thống tốt đẹp của dòng họ.",
+        "Đoàn kết, thương yêu, giúp đỡ lẫn nhau trong cuộc sống và công việc.",
+        "Chăm lo học tập, rèn luyện đạo đức, phấn đấu trở thành người có ích cho gia đình và xã hội.",
+        "Tham gia đầy đủ các buổi họp họ, đại lễ chạp họ và đóng góp quỹ khuyến học, quỹ từ đường.",
+        "Nghiêm túc thực hiện các nghi lễ thờ cúng tổ tiên đúng theo phong tục tập quán."
+      ],
       clanName: CLAN_NAME,
       lastUpdated: new Date().toISOString(),
       theme: 'tet'
@@ -168,8 +173,8 @@ const App: React.FC = () => {
         return <Events events={allEvents} isAdmin={isAdmin} onAddEvent={(e) => updateData({ events: [...appData.events, e] })} onDeleteEvent={(id) => updateData({ events: appData.events.filter(ev => ev.id !== id) })} />;
       case AppSection.NEWS:
         return (
-          <div className="animate-fadeIn space-y-12">
-            <h2 className="text-5xl font-traditional text-primary font-bold text-center">Tin Tức Dòng Họ</h2>
+          <div className="animate-fadeIn space-y-12 px-4 md:px-0">
+            <h2 className="text-4xl md:text-5xl font-traditional text-primary font-bold text-center">Tin Tức Dòng Họ</h2>
             {isAdmin && (
               <div className="flex justify-center"><button onClick={() => setEditingNews({ id: Date.now().toString(), title: '', date: new Date().toLocaleDateString('vi-VN'), summary: '', content: '' })} className="bg-primary text-white px-10 py-4 rounded-full font-black shadow-xl hover:scale-105 transition-transform">Soạn tin mới</button></div>
             )}
@@ -195,42 +200,50 @@ const App: React.FC = () => {
         );
       case AppSection.CHRONICLES:
         return (
-          <div className="max-w-4xl mx-auto animate-fadeIn">
-            <div className="paper-texture p-10 md:p-20 shadow-2xl rounded-sm border-[12px] border-double border-red-900/10 relative">
+          <div className="max-w-4xl mx-auto animate-fadeIn px-4">
+            <div className="paper-texture p-6 md:p-20 shadow-2xl rounded-sm border-[6px] md:border-[12px] border-double border-red-900/10 relative">
               <div className="flex justify-between items-center mb-10 border-b-4 border-red-900/5 pb-8">
-                <h2 className="text-5xl font-traditional italic font-black">Phả Kỹ</h2>
+                <h2 className="text-3xl md:text-5xl font-traditional italic font-black">Phả Kỹ</h2>
                 {isAdmin && <button onClick={() => setIsEditingText(!isEditingText)} className="bg-primary text-gold px-8 py-2 rounded-full text-xs font-black uppercase">{isEditingText ? "Xong" : "Sửa"}</button>}
               </div>
-              {isEditingText ? <textarea value={appData.historyText} onChange={(e) => updateData({ historyText: e.target.value })} className="w-full h-96 p-6 border-4 border-gold/10 bg-transparent font-traditional text-lg leading-relaxed focus:border-gold outline-none" /> : <div className="drop-cap whitespace-pre-wrap leading-relaxed text-gray-800 font-traditional text-xl">{appData.historyText}</div>}
+              {isEditingText ? <textarea value={appData.historyText} onChange={(e) => updateData({ historyText: e.target.value })} className="w-full h-96 p-6 border-4 border-gold/10 bg-transparent font-traditional text-lg leading-relaxed focus:border-gold outline-none" /> : <div className="drop-cap whitespace-pre-wrap leading-relaxed text-gray-800 font-traditional text-lg md:text-xl">{appData.historyText}</div>}
             </div>
           </div>
         );
       case AppSection.ANCESTRAL_HOUSE:
         return (
-          <div className="max-w-4xl mx-auto animate-fadeIn">
-            <div className="bg-white p-10 md:p-20 shadow-2xl rounded-[3rem] border border-red-900/5">
-               <h2 className="text-5xl font-traditional text-primary font-bold mb-10 text-center">Từ Đường Dòng Họ</h2>
-               <div className="prose prose-red max-w-none text-gray-700 leading-relaxed font-serif text-lg">
+          <div className="max-w-4xl mx-auto animate-fadeIn px-4">
+            <div className="bg-white p-6 md:p-20 shadow-2xl rounded-[2rem] md:rounded-[3rem] border border-red-900/5 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-gold via-red-900 to-gold opacity-50"></div>
+               <h2 className="text-3xl md:text-5xl font-traditional text-primary font-bold mb-10 text-center">Từ Đường Dòng Họ</h2>
+               <div className="prose prose-red max-w-none text-gray-700 leading-relaxed font-serif text-lg text-justify">
                  {appData.ancestralHouseText}
+               </div>
+               <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <img src="https://images.unsplash.com/photo-1548013146-72479768b921?auto=format&fit=crop&q=80&w=800" className="rounded-2xl shadow-md border-4 border-red-50" alt="Từ Đường 1" />
+                  <img src="https://images.unsplash.com/photo-1606290409405-c41935e40733?auto=format&fit=crop&q=80&w=800" className="rounded-2xl shadow-md border-4 border-red-50" alt="Từ Đường 2" />
                </div>
             </div>
           </div>
         );
       case AppSection.REGULATIONS:
         return (
-          <div className="max-w-4xl mx-auto animate-fadeIn">
-             <div className="bg-red-900 p-1 rounded-t-[3rem]">
-               <div className="bg-white p-10 md:p-20 shadow-2xl rounded-t-[2.5rem]">
-                  <h2 className="text-4xl font-traditional text-primary font-black mb-12 text-center uppercase tracking-widest">Tộc Ước & Quy Định</h2>
-                  <div className="space-y-6">
+          <div className="max-w-4xl mx-auto animate-fadeIn px-4">
+             <div className="bg-red-900 p-1 rounded-t-[2rem] md:rounded-t-[3rem]">
+               <div className="bg-white p-6 md:p-20 shadow-2xl rounded-t-[1.5rem] md:rounded-t-[2.5rem]">
+                  <h2 className="text-3xl md:text-4xl font-traditional text-primary font-black mb-12 text-center uppercase tracking-widest">Tộc Ước & Quy Định</h2>
+                  <div className="space-y-8">
                     {appData.regulations.map((reg, i) => (
-                      <div key={i} className="flex gap-6 items-start group">
-                        <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-900 flex items-center justify-center font-black flex-shrink-0 group-hover:bg-red-900 group-hover:text-gold transition-all">
+                      <div key={i} className="flex gap-4 md:gap-6 items-start group">
+                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-red-50 text-red-900 flex items-center justify-center font-black flex-shrink-0 group-hover:bg-red-900 group-hover:text-gold transition-all border border-red-100">
                           {i + 1}
                         </div>
-                        <p className="text-gray-800 font-medium text-lg pt-2">{reg}</p>
+                        <p className="text-gray-800 font-medium text-base md:text-lg pt-2 leading-snug">{reg}</p>
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-20 text-center border-t border-gray-100 pt-10">
+                    <p className="text-gray-400 font-traditional italic">"Kính mong toàn thể con cháu đồng lòng thực hiện."</p>
                   </div>
                </div>
              </div>
@@ -248,7 +261,6 @@ const App: React.FC = () => {
       <div className="bg-primary text-gold text-[10px] py-1.5 text-center font-black tracking-[0.4em] uppercase border-b border-gold/20">Gia Phả Trực Tuyến - {appData.clanName}</div>
       <header className="relative w-full h-[250px] md:h-[450px] flex items-center justify-center bg-black overflow-hidden shadow-2xl">
         <img src={appData.bannerUrl} className="absolute inset-0 w-full h-full object-cover opacity-80" alt="Banner" />
-        {/* Đã xóa tiêu đề và khẩu hiệu đè lên ảnh theo yêu cầu */}
         <div className="absolute bottom-4 right-4 flex gap-2 z-30">
            {isAdmin && <button onClick={() => setShowBannerEdit(true)} className="bg-white/90 text-red-950 px-4 py-2 rounded-full font-black text-xs uppercase shadow-xl hover:bg-white">🖼️ Đổi ảnh</button>}
            <button onClick={handleSync} disabled={isSyncing} className="bg-gold/90 text-red-950 px-4 py-2 rounded-full font-black text-xs uppercase shadow-xl hover:bg-white">{isSyncing ? "⌛ Tải..." : "🔄 Đồng bộ"}</button>
@@ -349,13 +361,13 @@ const App: React.FC = () => {
                               }} className="text-[10px] font-black text-red-400 hover:text-red-600">Xoá</button>
                          </div>
                          <div className="flex flex-col gap-1">
-                            <label className="text-[8px] font-black uppercase text-emerald-300 tracking-wider">Là con của bà:</label>
+                            <label className="text-[8px] font-black uppercase text-emerald-300 tracking-wider">Là con của mẹ:</label>
                             <select value={child.otherParentId || ''} onChange={(e) => {
                                 const newChildren = [...(editingMember.children || [])];
                                 newChildren[idx] = {...newChildren[idx], otherParentId: e.target.value};
                                 setEditingMember({...editingMember, children: newChildren});
                               }} className="w-full bg-white border border-emerald-100 p-2 rounded-xl text-xs font-bold text-emerald-900 outline-none">
-                               <option value="">-- Không xác định --</option>
+                               <option value="">-- Không rõ --</option>
                                {(editingMember.spouses || []).map(s => (
                                  <option key={s.id} value={s.id}>{s.name || 'Vợ chưa đặt tên'}</option>
                                ))}
