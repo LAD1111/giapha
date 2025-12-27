@@ -8,7 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Quicksand:wght@300;400;500;700&family=Great+Vibes&family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <!-- Thêm &subset=vietnamese để đảm bảo các font hỗ trợ đầy đủ dấu tiếng Việt -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Quicksand:wght@300;400;500;700&family=Great+Vibes&family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
     <style>
       :root {
         --primary-red: #8b0000;
@@ -25,7 +26,7 @@
       }
 
       body {
-        font-family: 'Quicksand', sans-serif;
+        font-family: 'Quicksand', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         background-color: var(--soft-bg);
         background-image: url('https://www.transparenttextures.com/patterns/handmade-paper.png');
         margin: 0;
@@ -34,7 +35,8 @@
         transition: background-color 0.5s ease;
       }
 
-      .font-traditional { font-family: 'Playfair Display', serif; }
+      /* Đảm bảo font truyền thống có font dự phòng là serif */
+      .font-traditional { font-family: 'Playfair Display', 'Times New Roman', serif; }
       .font-festive { font-family: 'Great Vibes', cursive; }
       .font-script { font-family: 'Dancing Script', cursive; }
       
@@ -43,7 +45,7 @@
       .text-gold { color: var(--accent-gold); }
       .border-gold { border-color: var(--accent-gold); }
       
-      /* Blossom Animation only for Tet theme */
+      /* Blossom Animation */
       .blossom {
         position: fixed;
         top: -10%;
@@ -73,7 +75,17 @@
         background-image: url('https://www.transparenttextures.com/patterns/rice-paper-2.png');
       }
 
-      /* Classic mode overrides */
+      /* Sửa lỗi hiển thị Drop cap với tiếng Việt */
+      .drop-cap::first-letter {
+        font-family: 'Playfair Display', serif;
+        font-size: 5rem;
+        font-weight: 900;
+        float: left;
+        line-height: 1;
+        margin-right: 0.5rem;
+        color: var(--primary-red);
+      }
+
       .theme-classic .blossom { display: none; }
       .theme-classic header { filter: grayscale(0.5); }
     </style>

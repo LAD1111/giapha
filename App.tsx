@@ -39,8 +39,8 @@ const App: React.FC = () => {
       ],
       bannerUrl: "https://images.unsplash.com/photo-1577908581023-95245842c8d2?auto=format&fit=crop&q=80&w=2000",
       address: CLAN_ADDRESS,
-      historyText: "Lịch sử dòng họ Lê là một hành trình dài của sự hiếu học, đoàn kết và cống hiến...",
-      ancestralHouseText: "Từ đường là nơi thờ tự linh thiêng, lưu giữ hồn cốt tổ tiên qua bao thế hệ.",
+      historyText: "Lịch sử dòng họ Lê là một hành trình dài của sự hiếu học, đoàn kết và cống hiến. Trải qua hàng trăm năm, các thế hệ tổ tiên đã bồi đắp nên những giá trị văn hóa tốt đẹp, để lại cho con cháu một gia tài tinh thần quý giá về đạo làm người và tình yêu quê hương đất nước.",
+      ancestralHouseText: "Từ đường là nơi thờ tự linh thiêng, lưu giữ hồn cốt tổ tiên qua bao thế hệ. Đây là nơi hội tụ của con cháu mỗi dịp lễ tết, là cầu nối tâm linh giữa quá khứ và hiện tại.",
       regulations: [
         "Tôn thờ tổ tiên, hiếu thảo với cha mẹ.",
         "Đoàn kết, tương trợ giữa các thành viên.",
@@ -133,7 +133,6 @@ const App: React.FC = () => {
     setAppData(prev => ({ ...prev, ...updates, lastUpdated: new Date().toISOString() }));
   };
 
-  // Fix: Added missing handleCloudLinkChange function to update cloud link and persist it localy.
   const handleCloudLinkChange = (link: string) => {
     setCloudLink(link);
     localStorage.setItem('cloud_data_link', link);
@@ -211,19 +210,23 @@ const App: React.FC = () => {
       case AppSection.CHRONICLES:
         return (
           <div className="max-w-4xl mx-auto animate-fadeIn">
-            <div className="paper-texture p-12 md:p-20 shadow-2xl rounded-sm border-[24px] border-double border-red-900/10">
-              <div className="flex justify-between items-center border-b-4 border-red-900/5 pb-10 mb-12">
-                <h2 className="text-5xl font-traditional text-gray-900 italic font-black">Phả Kỹ Gia Tộc</h2>
+            <div className="paper-texture p-10 md:p-20 shadow-2xl rounded-sm border-[12px] md:border-[24px] border-double border-red-900/10">
+              <div className="flex flex-col md:flex-row justify-between items-center border-b-4 border-red-900/5 pb-8 mb-10 gap-4">
+                <h2 className="text-4xl md:text-5xl font-traditional text-gray-900 italic font-black">Phả Kỹ Gia Tộc</h2>
                 {isAdmin && (
-                  <button onClick={() => setIsEditingText(!isEditingText)} className="bg-primary text-white px-8 py-2 rounded-full font-bold">
+                  <button onClick={() => setIsEditingText(!isEditingText)} className="bg-primary text-gold px-8 py-2 rounded-full font-black text-xs uppercase shadow-lg">
                     {isEditingText ? "Hoàn tất" : "Biên tập"}
                   </button>
                 )}
               </div>
               {isEditingText ? (
-                <textarea value={appData.historyText} onChange={(e) => updateData({ historyText: e.target.value })} className="w-full h-[600px] p-10 border-4 bg-transparent font-serif text-xl leading-relaxed outline-none" />
+                <textarea 
+                  value={appData.historyText} 
+                  onChange={(e) => updateData({ historyText: e.target.value })} 
+                  className="w-full h-[600px] p-6 md:p-10 border-4 border-gold/10 bg-transparent font-traditional text-lg md:text-xl leading-relaxed outline-none focus:border-gold/30 transition-all" 
+                />
               ) : (
-                <div className="whitespace-pre-wrap leading-loose text-gray-800 font-serif text-xl text-justify first-letter:text-7xl first-letter:font-bold first-letter:text-primary first-letter:float-left first-letter:mr-3">
+                <div className="drop-cap whitespace-pre-wrap leading-relaxed text-gray-800 font-traditional text-lg md:text-2xl text-justify">
                   {appData.historyText}
                 </div>
               )}
@@ -233,7 +236,7 @@ const App: React.FC = () => {
       case AppSection.ANCESTRAL_HOUSE:
         return (
           <div className="max-w-5xl mx-auto animate-fadeIn space-y-12">
-            <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden">
+            <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border border-red-900/5">
               <div className="h-[300px] md:h-[500px] relative">
                 <img src="https://images.unsplash.com/photo-1598640845355-668b5550dfb0?auto=format&fit=crop&q=80&w=1600" className="w-full h-full object-cover" alt="Từ Đường" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
@@ -242,17 +245,17 @@ const App: React.FC = () => {
                    <p className="text-gold font-bold text-lg md:text-2xl mt-2 md:mt-4">{appData.address}</p>
                 </div>
               </div>
-              <div className="p-10 md:p-16">
+              <div className="p-8 md:p-16">
                  {isEditingText ? (
-                   <textarea value={appData.ancestralHouseText} onChange={(e) => updateData({ ancestralHouseText: e.target.value })} className="w-full h-40 border p-4 rounded-xl" />
+                   <textarea value={appData.ancestralHouseText} onChange={(e) => updateData({ ancestralHouseText: e.target.value })} className="w-full h-40 border p-4 rounded-xl font-traditional text-lg" />
                  ) : (
-                   <p className="text-gray-700 leading-loose text-xl md:text-2xl italic border-l-8 border-gold pl-6 md:pl-10 py-4 bg-gray-50/50">
+                   <p className="text-gray-700 leading-relaxed font-traditional text-xl md:text-3xl italic border-l-8 border-gold pl-6 md:pl-12 py-4 bg-red-50/20">
                      {appData.ancestralHouseText}
                    </p>
                  )}
                  {isAdmin && (
-                   <button onClick={() => setIsEditingText(!isEditingText)} className="mt-8 bg-primary text-gold px-8 py-3 rounded-full font-black">
-                     {isEditingText ? "Lưu" : "Chỉnh sửa"}
+                   <button onClick={() => setIsEditingText(!isEditingText)} className="mt-8 bg-primary text-gold px-8 py-3 rounded-full font-black uppercase text-xs">
+                     {isEditingText ? "Lưu thay đổi" : "Chỉnh sửa nội dung"}
                    </button>
                  )}
               </div>
@@ -265,27 +268,26 @@ const App: React.FC = () => {
             <div className="bg-[#fffcf0] p-10 md:p-16 shadow-2xl rounded-sm border-[16px] md:border-[32px] border-double border-gray-900/10 text-center">
                <h2 className="text-4xl md:text-6xl font-traditional text-primary font-black uppercase mb-8 md:mb-12">Tộc Ước</h2>
                {isEditingText ? (
-                 <textarea value={appData.regulations.join('\n')} onChange={(e) => updateData({ regulations: e.target.value.split('\n') })} className="w-full h-80 border p-4" />
+                 <textarea value={appData.regulations.join('\n')} onChange={(e) => updateData({ regulations: e.target.value.split('\n') })} className="w-full h-80 border p-4 font-traditional text-lg" />
                ) : (
-                 <div className="space-y-6 md:space-y-8 text-left max-w-2xl mx-auto">
+                 <div className="space-y-6 md:space-y-10 text-left max-w-2xl mx-auto">
                     {appData.regulations.map((reg, idx) => (
-                      <div key={idx} className="flex gap-4 md:gap-8 items-start">
-                        <div className="w-10 h-10 md:w-12 md:h-12 bg-primary text-gold rounded-full flex items-center justify-center font-bold flex-shrink-0">{idx + 1}</div>
-                        <p className="text-lg md:text-2xl text-gray-900 font-bold italic">{reg}</p>
+                      <div key={idx} className="flex gap-4 md:gap-8 items-start group">
+                        <div className="w-10 h-10 md:w-14 md:h-14 bg-primary text-gold rounded-full flex items-center justify-center font-black text-lg md:text-2xl flex-shrink-0 shadow-lg group-hover:scale-110 transition-transform">{idx + 1}</div>
+                        <p className="text-xl md:text-3xl text-gray-900 font-traditional font-bold italic border-b border-gold/10 pb-2 flex-1">{reg}</p>
                       </div>
                     ))}
                  </div>
                )}
                {isAdmin && (
-                 <button onClick={() => setIsEditingText(!isEditingText)} className="mt-8 md:mt-12 bg-primary text-gold px-8 md:px-12 py-3 md:py-4 rounded-full font-black">
-                   {isEditingText ? "Lưu Tộc Ước" : "Chỉnh sửa Tộc Ước"}
+                 <button onClick={() => setIsEditingText(!isEditingText)} className="mt-8 md:mt-16 bg-primary text-gold px-10 md:px-14 py-3 md:py-4 rounded-full font-black uppercase text-xs md:text-sm shadow-xl">
+                   {isEditingText ? "Lưu Tộc Ước" : "Biên tập Tộc Ước"}
                  </button>
                )}
             </div>
           </div>
         );
       case AppSection.EVENTS:
-        // Truyền allEvents (bao gồm ngày giỗ từ phả đồ) vào component Events
         return <Events events={allEvents} isAdmin={isAdmin} onAddEvent={(e) => updateData({ events: [...appData.events, e] })} onDeleteEvent={(id) => updateData({ events: appData.events.filter(ev => ev.id !== id) })} />;
       default: return null;
     }
@@ -335,7 +337,6 @@ const App: React.FC = () => {
         <main className="mt-10 md:mt-20">{renderSection()}</main>
       </div>
 
-      {/* Modals remain the same... */}
       {showBannerEdit && (
         <div className="fixed inset-0 bg-black/90 z-[500] flex items-center justify-center p-8 backdrop-blur-md">
           <div className="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3rem] w-full max-w-lg text-center shadow-2xl border-4 border-gold">

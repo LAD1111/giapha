@@ -51,6 +51,10 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
     ));
   };
 
+  const nameFontSizeClass = isCompact 
+    ? 'text-[13px] leading-tight py-1' 
+    : (isGen1To2 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl');
+
   return (
     <div className="flex flex-col items-center transition-all duration-500 w-full">
       <div className="relative group flex flex-col items-center justify-center">
@@ -74,10 +78,6 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
               </div>
             )}
 
-            {isGen1To2 && (
-              <div className="absolute -top-6 -right-6 text-2xl md:text-3xl animate-bounce">🧧</div>
-            )}
-
             {isAdmin && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onEdit?.(member); }}
@@ -89,7 +89,7 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
 
             <div className={`
               font-bold text-red-950 font-traditional text-center tracking-tight
-              ${isCompact ? 'text-[13px] leading-tight py-1' : (isGen1To2 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl')}
+              ${nameFontSizeClass}
               ${isNameMatched ? 'text-yellow-700' : ''}
             `}>
               {isCompact ? renderVerticalName(member.name) : member.name}
@@ -127,16 +127,16 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
             <div className={`
               relative transition-all duration-500 transform 
               ${isCompact 
-                ? 'w-16 p-3 rounded-2xl border-2 border-dashed bg-white/70 shadow-lg' 
-                : 'w-48 md:w-64 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border-4 border-dashed bg-pink-50/30 shadow-xl'
+                ? 'w-16 p-3 rounded-2xl border-2 border-dashed bg-white shadow-lg' 
+                : 'w-48 md:w-64 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border-4 border-dashed bg-pink-50/20 shadow-xl'
               }
               border-pink-900/20
               ${isSpouseMatched ? 'ring-4 ring-yellow-400 border-yellow-500 scale-105 z-20 !shadow-[0_0_30px_rgba(234,179,8,0.5)]' : 'group-hover:-translate-y-1 md:group-hover:-translate-y-2'}
             `}>
               <div className={`
-                font-bold text-pink-950 font-traditional text-center tracking-tight opacity-80
-                ${isCompact ? 'text-[12px] leading-tight py-1' : 'text-lg md:text-xl'}
-                ${isSpouseMatched ? 'text-yellow-700 opacity-100' : ''}
+                font-bold text-pink-950 font-traditional text-center tracking-tight
+                ${nameFontSizeClass}
+                ${isSpouseMatched ? 'text-yellow-700' : ''}
               `}>
                 {isCompact ? renderVerticalName(member.spouseName) : member.spouseName}
               </div>
