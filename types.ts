@@ -1,11 +1,11 @@
 
 export enum AppSection {
+  EVENTS = 'SỰ KIỆN',
   NEWS = 'TIN TỨC',
   TREE = 'PHẢ ĐỒ',
   CHRONICLES = 'PHẢ KỸ',
   ANCESTRAL_HOUSE = 'TỪ ĐƯỜNG',
-  REGULATIONS = 'TỘC ƯỚC',
-  EVENTS = 'SỰ KIỆN'
+  REGULATIONS = 'TỘC ƯỚC'
 }
 
 export type AppTheme = 'classic' | 'tet';
