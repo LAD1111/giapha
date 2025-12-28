@@ -15,15 +15,19 @@ export interface Spouse {
   name: string;
   birthDate?: string;
   deathDate?: string;
+  restingPlace?: string;
 }
 
 export interface FamilyMember {
   id: string;
   name: string;
+  nickname?: string; // Tên tự, Hiệu
+  title?: string; // Chức vụ, Phẩm hàm, Học vị
   generation: number;
   birthDate?: string;
   deathDate?: string;
   lunarDeathDate?: string;
+  restingPlace?: string; // Mộ phần
   spouseName?: string; // Legacy
   spouseBirthDate?: string; // Legacy
   spouseDeathDate?: string; // Legacy

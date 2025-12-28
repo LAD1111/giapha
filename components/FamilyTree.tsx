@@ -16,7 +16,6 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = member.children && member.children.length > 0;
 
-  // Combine legacy spouse and multi-spouses
   const allSpouses = useMemo(() => {
     const list: Partial<Spouse>[] = [...(member.spouses || [])];
     if (member.spouseName && !list.some(s => s.name === member.spouseName)) {
@@ -31,8 +30,8 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
     
     const checkNode = (node: FamilyMember): boolean => {
       if (node.name.toLowerCase().includes(q)) return true;
+      if (node.nickname?.toLowerCase().includes(q)) return true;
       if (node.spouses?.some(s => s.name.toLowerCase().includes(q))) return true;
-      if (node.spouseName?.toLowerCase().includes(q)) return true;
       if (node.children) return node.children.some(checkNode);
       return false;
     };
@@ -51,8 +50,11 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
   };
 
   const isCompact = member.generation >= 4;
-  const isGen1To2 = member.generation === 1;
-  const isNameMatched = searchQuery && member.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const isGen1 = member.generation === 1;
+  const isNameMatched = searchQuery && (
+    member.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (member.nickname && member.nickname.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   const renderVerticalName = (name: string) => {
     return name.split(' ').map((word, i) => (
@@ -62,17 +64,18 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
 
   const nameFontSizeClass = isCompact 
     ? 'text-[13px] leading-tight py-1' 
-    : (isGen1To2 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl');
+    : (isGen1 ? 'text-2xl md:text-3xl' : 'text-lg md:text-xl');
 
   return (
     <div className="flex flex-col items-center transition-all duration-500">
-      {/* Container cho cụ thân sinh và các phối ngẫu */}
       <div className="flex flex-row items-start justify-center relative z-10">
-        
-        {/* Cột Chính: Người Nam (Cha) */}
         <div className="flex flex-col items-center relative">
-          <div className={`
-            relative transition-all duration-500 transform 
+          {/* Card Thân Tộc - Thêm class 'group' để Hover hoạt động và cursor-pointer khi Admin */}
+          <div 
+            onClick={() => isAdmin && onEdit?.(member)}
+            className={`
+            group relative transition-all duration-500 transform 
+            ${isAdmin ? 'cursor-pointer' : ''}
             ${isCompact 
               ? 'w-16 p-3 rounded-2xl border-2 bg-white shadow-xl' 
               : 'w-48 md:w-64 p-4 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border-4 bg-white shadow-2xl'
@@ -81,8 +84,8 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
               ? 'border-red-900/40 shadow-red-900/5' 
               : 'border-pink-900/40 shadow-pink-900/5'
             }
-            ${isGen1To2 ? 'ring-8 ring-red-900/5 ring-offset-4 border-red-900 bg-red-50/50' : ''}
-            ${isNameMatched ? 'ring-4 ring-yellow-400 border-yellow-500 scale-105 z-20 !shadow-[0_0_30px_rgba(234,179,8,0.5)]' : 'group-hover:-translate-y-1 md:group-hover:-translate-y-2'}
+            ${isGen1 ? 'ring-8 ring-red-900/5 ring-offset-4 border-red-900 bg-red-50/50 z-30' : ''}
+            ${isNameMatched ? 'ring-4 ring-yellow-400 border-yellow-500 scale-105 z-40 !shadow-[0_0_30px_rgba(234,179,8,0.5)]' : 'group-hover:-translate-y-1 md:group-hover:-translate-y-2'}
           `}>
             {!isCompact && (
               <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-sm z-20 ${member.isMale ? 'bg-red-900 text-white' : 'bg-pink-600 text-white'}`}>
@@ -90,18 +93,21 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
               </div>
             )}
 
+            {/* Các nút chức năng - class 'group-hover:opacity-100' đã có 'group' ở thẻ cha để kích hoạt */}
             {isAdmin && (
-              <div className="absolute -top-4 -left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all z-30">
+              <div className="absolute -top-4 -left-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all z-50">
                 <button 
                   onClick={(e) => { e.stopPropagation(); onEdit?.(member); }}
-                  className={`bg-yellow-500 text-white rounded-full p-2 shadow-xl hover:bg-yellow-600 ${isCompact ? 'scale-75' : ''}`}
+                  className={`bg-yellow-500 text-white rounded-full p-2 shadow-xl hover:bg-yellow-600 active:scale-90 ${isCompact ? 'scale-75' : ''}`}
+                  title="Sửa thông tin"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                 </button>
-                {!isGen1To2 && (
+                {!isGen1 && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); if(confirm(`Xóa ${member.name}?`)) onDelete?.(member.id); }}
-                    className={`bg-red-600 text-white rounded-full p-2 shadow-xl hover:bg-red-700 ${isCompact ? 'scale-75' : ''}`}
+                    className={`bg-red-600 text-white rounded-full p-2 shadow-xl hover:bg-red-700 active:scale-90 ${isCompact ? 'scale-75' : ''}`}
+                    title="Xóa thành viên"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
                   </button>
@@ -119,6 +125,9 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
 
             {!isCompact && (
               <div className="mt-2 md:mt-4 space-y-1 text-center">
+                {member.title && (
+                  <div className="text-[10px] text-red-900 font-black uppercase mb-1">{member.title}</div>
+                )}
                 {member.birthDate && (
                   <div className="text-[9px] md:text-[10px] text-gray-500 font-bold uppercase tracking-wider">
                     Sinh: <span className="text-red-900/60 italic">{member.birthDate}</span>
@@ -126,11 +135,11 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
                 )}
                 {(member.deathDate || member.lunarDeathDate) && (
                   <div className="text-[9px] md:text-[10px] text-red-700/80 font-black uppercase tracking-wider">
-                    Mất: <span className="italic">{member.lunarDeathDate || member.deathDate} (ÂL)</span>
+                    Giỗ: <span className="italic">{member.lunarDeathDate || member.deathDate} (ÂL)</span>
                   </div>
                 )}
-                <div className={`text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] rounded-full py-1 mt-2 md:mt-4 inline-block px-3 md:px-4 ${isGen1To2 ? 'bg-red-900 text-gold shadow-lg' : 'bg-red-50 text-red-900/60'}`}>
-                  {isGen1To2 ? 'Cụ Tổ' : `Đời ${member.generation}`}
+                <div className={`text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] rounded-full py-1 mt-2 md:mt-4 inline-block px-3 md:px-4 ${isGen1 ? 'bg-red-900 text-gold shadow-lg' : 'bg-red-50 text-red-900/60'}`}>
+                  {isGen1 ? 'Cụ Tổ' : `Đời ${member.generation}`}
                 </div>
               </div>
             )}
@@ -138,7 +147,7 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
             {isAdmin && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onAddChild?.(member); }}
-                className={`absolute -bottom-4 -right-4 bg-red-800 text-white rounded-full p-2 shadow-xl hover:bg-red-950 hover:scale-110 z-30 transition-all ${isCompact ? 'scale-75' : ''}`}
+                className={`absolute -bottom-4 -right-4 bg-red-800 text-white rounded-full p-2 shadow-xl hover:bg-red-950 hover:scale-110 z-50 transition-all ${isCompact ? 'scale-75' : ''}`}
                 title="Thêm con"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" /></svg>
@@ -146,11 +155,10 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
             )}
           </div>
 
-          {/* Nút bấm thu gọn & Đường kẻ đi xuống bắt nguồn từ cha */}
           {hasChildren && (
             <div className="relative w-full flex flex-col items-center">
               <button
-                onClick={toggleExpand}
+                onClick={(e) => { e.stopPropagation(); toggleExpand(); }}
                 className={`
                   absolute top-[-8px] md:top-[-12px] z-20 w-8 h-8 rounded-full border-2 shadow-2xl flex items-center justify-center transition-all duration-300
                   ${isExpanded ? 'bg-red-950 border-gold text-gold rotate-0' : 'bg-gold border-red-950 text-red-950 rotate-180'}
@@ -160,18 +168,19 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
               </button>
               
               {isExpanded && (
-                <div className={`absolute top-[20px] bg-red-900/20 -z-10 w-[4px] h-[28px] md:h-[36px] ${isGen1To2 ? 'w-[6px] bg-red-900/40' : ''}`} />
+                <div className={`absolute top-[20px] bg-red-900/20 -z-10 w-[4px] h-[28px] md:h-[36px] ${isGen1 ? 'w-[6px] bg-red-900/40' : ''}`} />
               )}
             </div>
           )}
         </div>
 
-        {/* Cột Phụ: Các Bà (Vợ) - Hiển thị bên cạnh nhưng không có đường kẻ đi xuống trực tiếp từ ô này */}
         <div className="flex flex-row items-start gap-2 ml-2">
           {allSpouses.map((spouse, idx) => {
             const isSpouseMatched = searchQuery && spouse.name?.toLowerCase().includes(searchQuery.toLowerCase());
             return (
-              <div key={spouse.id || idx} className={`
+              <div 
+                key={spouse.id || idx} 
+                className={`
                 relative transition-all duration-500 transform 
                 ${isCompact 
                   ? 'w-16 p-3 rounded-2xl border-2 border-dashed bg-white shadow-lg' 
@@ -203,38 +212,29 @@ const MemberNode: React.FC<MemberNodeProps> = ({ member, isAdmin, searchQuery, o
         </div>
       </div>
       
-      {/* Khối Hiển Thị Con Cái */}
       {hasChildren && isExpanded && (
         <div className="relative mt-12 md:mt-12 animate-fadeIn w-full flex flex-col items-center">
-          {/* Căn chỉnh khối con cái bắt đầu từ dưới "đường kẻ cha" */}
           <div className="flex flex-row justify-center relative w-full pt-0">
              {member.children?.map((child, index) => {
                 const isFirst = index === 0;
                 const isLast = index === (member.children?.length ?? 0) - 1;
                 const childIsCompact = child.generation >= 4;
-                
-                // Lấy thông tin bà mẹ (nếu có)
                 const motherSpouse = allSpouses.find(s => s.id === child.otherParentId);
                 
                 return (
                   <div key={child.id} className={`relative flex flex-col items-center flex-1 ${childIsCompact ? 'px-1' : 'px-4 md:px-6'}`}>
-                     {/* Đường ngang kết nối các con */}
                      {member.children && member.children.length > 1 && (
                         <div className={`
                           absolute top-0 h-[4px] bg-red-900/20
                           ${isFirst ? 'left-1/2 right-0' : isLast ? 'left-0 right-1/2' : 'left-0 right-0'}
                         `}></div>
                      )}
-                     {/* Đường dọc từ đường ngang xuống từng ô con */}
                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[4px] h-6 md:h-8 bg-red-900/20 -z-10"></div>
-                     
-                     {/* Ghi chú: Con của bà nào */}
                      {motherSpouse && !childIsCompact && (
                        <div className="absolute top-1 left-1/2 -translate-x-1/2 bg-pink-100/80 text-pink-800 text-[6px] md:text-[8px] font-black uppercase px-2 py-0.5 rounded-full z-10 border border-pink-200 shadow-sm whitespace-nowrap">
                          Mẹ: {motherSpouse.name || '?'}
                        </div>
                      )}
-
                      <div className="mt-6 md:mt-8 w-full flex justify-center">
                        <MemberNode 
                          member={child} 
@@ -463,7 +463,7 @@ const FamilyTree: React.FC<FamilyTreeProps> = ({ root, isAdmin, onEditMember, on
         </div>
       </div>
       <div className="bg-white/90 border-t border-red-900/5 px-6 py-2 flex justify-between items-center text-[9px] font-bold text-red-950/30 uppercase tracking-widest">
-        <span>Lăn chuột hoặc Pinch để Zoom • Kéo để di chuyển • Nhánh con luôn bắt đầu từ phía cha</span>
+        <span>Lăn chuột hoặc Pinch để Zoom • Kéo để di chuyển • Nhấn vào thẻ để sửa (Admin)</span>
         <span className="hidden md:block">Hệ Thống Gia Phả Số © 2024</span>
       </div>
     </div>

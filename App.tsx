@@ -13,7 +13,8 @@ import {
 const DEFAULT_CLOUD_LINK = "https://docs.google.com/document/d/17fVZaOxx8s-gS3tFE3nj1fdmSJdYWw0mi_ar45TUoQw/edit?usp=sharing";
 
 const App: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<AppSection>(AppSection.TREE);
+  // Thay đổi AppSection.TREE thành AppSection.EVENTS để mặc định hiển thị Sự kiện khi mở web
+  const [activeSection, setActiveSection] = useState<AppSection>(AppSection.EVENTS);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [cloudLink, setCloudLink] = useState<string>(() => localStorage.getItem('cloud_data_link') || DEFAULT_CLOUD_LINK);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -161,16 +162,20 @@ const App: React.FC = () => {
           isAdmin={isAdmin} 
           onEditMember={(m) => {
             const memberToEdit = {...m};
-            if (memberToEdit.spouseName && (!memberToEdit.spouses || memberToEdit.spouses.length === 0)) {
-               memberToEdit.spouses = [{ id: 'legacy-' + m.id, name: memberToEdit.spouseName, deathDate: memberToEdit.spouseDeathDate }];
+            // Ensure spouses array exists for editor
+            if (!memberToEdit.spouses || memberToEdit.spouses.length === 0) {
+               if (memberToEdit.spouseName) {
+                 memberToEdit.spouses = [{ id: 'legacy-' + m.id, name: memberToEdit.spouseName, deathDate: memberToEdit.spouseDeathDate }];
+               } else {
+                 memberToEdit.spouses = [];
+               }
             }
             setEditingMember(memberToEdit);
           }} 
           onDeleteMember={deleteMember}
           onAddChild={(p) => addChildToMember(p.id)} 
         />;
-      case AppSection.EVENTS:
-        return <Events events={allEvents} isAdmin={isAdmin} onAddEvent={(e) => updateData({ events: [...appData.events, e] })} onDeleteEvent={(id) => updateData({ events: appData.events.filter(ev => ev.id !== id) })} />;
+      case AppSection.EVENTS: return <Events events={allEvents} isAdmin={isAdmin} onAddEvent={(e) => updateData({ events: [...appData.events, e] })} onDeleteEvent={(id) => updateData({ events: appData.events.filter(ev => ev.id !== id) })} />;
       case AppSection.NEWS:
         return (
           <div className="animate-fadeIn space-y-12 px-4 md:px-0">
@@ -219,10 +224,6 @@ const App: React.FC = () => {
                <div className="prose prose-red max-w-none text-gray-700 leading-relaxed font-serif text-lg text-justify">
                  {appData.ancestralHouseText}
                </div>
-               <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <img src="https://images.unsplash.com/photo-1548013146-72479768b921?auto=format&fit=crop&q=80&w=800" className="rounded-2xl shadow-md border-4 border-red-50" alt="Từ Đường 1" />
-                  <img src="https://images.unsplash.com/photo-1606290409405-c41935e40733?auto=format&fit=crop&q=80&w=800" className="rounded-2xl shadow-md border-4 border-red-50" alt="Từ Đường 2" />
-               </div>
             </div>
           </div>
         );
@@ -242,9 +243,6 @@ const App: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-20 text-center border-t border-gray-100 pt-10">
-                    <p className="text-gray-400 font-traditional italic">"Kính mong toàn thể con cháu đồng lòng thực hiện."</p>
-                  </div>
                </div>
              </div>
           </div>
@@ -258,6 +256,7 @@ const App: React.FC = () => {
       {isAdmin && (
         <AdminPanel cloudLink={cloudLink} theme={appData.theme || 'tet'} onCloudLinkChange={(l) => { setCloudLink(l); localStorage.setItem('cloud_data_link', l); }} onThemeChange={(t) => updateData({ theme: t })} onExport={() => { navigator.clipboard.writeText(JSON.stringify(appData, null, 2)); showToast("Đã sao chép JSON!"); }} onLogout={() => setIsAdmin(false)} />
       )}
+      
       <div className="bg-primary text-gold text-[10px] py-1.5 text-center font-black tracking-[0.4em] uppercase border-b border-gold/20">Gia Phả Trực Tuyến - {appData.clanName}</div>
       <header className="relative w-full h-[250px] md:h-[450px] flex items-center justify-center bg-black overflow-hidden shadow-2xl">
         <img src={appData.bannerUrl} className="absolute inset-0 w-full h-full object-cover opacity-80" alt="Banner" />
@@ -274,100 +273,153 @@ const App: React.FC = () => {
 
       {editingMember && (
         <div className="fixed inset-0 bg-black/95 z-[500] flex items-center justify-center p-4 md:p-8 overflow-y-auto backdrop-blur-md animate-fadeIn">
-          <div className="bg-white p-6 md:p-12 rounded-[2.5rem] w-full max-w-5xl shadow-2xl border-4 border-gold/20 relative">
+          <div className="bg-white p-6 md:p-12 rounded-[2.5rem] w-full max-w-6xl shadow-2xl border-4 border-red-900/10 relative">
             <button onClick={() => setEditingMember(null)} className="absolute top-6 right-6 text-gray-400 hover:text-red-600 text-3xl transition-colors">×</button>
-            <div className="flex flex-col md:flex-row justify-between items-start border-b pb-8 mb-8 gap-6">
+            
+            <div className="flex flex-col md:flex-row justify-between items-start border-b-2 border-red-50 pb-8 mb-8 gap-6">
               <div>
-                <h3 className="text-3xl font-traditional font-black text-gray-900">Thông tin: {editingMember.name || 'Thành viên mới'}</h3>
-                <p className="text-primary font-black uppercase text-[10px] tracking-widest mt-1">Thế hệ thứ {editingMember.generation}</p>
+                <h3 className="text-4xl font-traditional font-black text-red-950">Phả Bản: {editingMember.name || 'Thành viên mới'}</h3>
+                <p className="text-primary font-black uppercase text-[10px] tracking-widest mt-2 flex items-center gap-2">
+                  <span className="bg-red-900 text-gold px-3 py-1 rounded-full">Đời thứ {editingMember.generation}</span>
+                  <span className="text-gray-400">|</span>
+                  <span className="text-gray-500 italic">Mã định danh: {editingMember.id}</span>
+                </p>
               </div>
-              <div className="flex bg-gray-100 p-1.5 rounded-2xl">
-                <button onClick={() => setEditingMember({...editingMember, isMale: true})} className={`px-8 py-3 rounded-xl text-xs font-black uppercase transition-all ${editingMember.isMale ? 'bg-primary text-white shadow-xl scale-105' : 'text-gray-400'}`}>Nam</button>
-                <button onClick={() => setEditingMember({...editingMember, isMale: false})} className={`px-8 py-3 rounded-xl text-xs font-black uppercase transition-all ${!editingMember.isMale ? 'bg-pink-600 text-white shadow-xl scale-105' : 'text-gray-400'}`}>Nữ</button>
+              <div className="flex bg-gray-100 p-2 rounded-3xl border border-gray-200">
+                <button onClick={() => setEditingMember({...editingMember, isMale: true})} className={`px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${editingMember.isMale ? 'bg-red-950 text-gold shadow-xl scale-105' : 'text-gray-400'}`}>Nam Tộc</button>
+                <button onClick={() => setEditingMember({...editingMember, isMale: false})} className={`px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${!editingMember.isMale ? 'bg-pink-600 text-white shadow-xl scale-105' : 'text-gray-400'}`}>Nữ Tộc</button>
               </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-              <div className="space-y-8">
-                <h4 className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-primary"></span> 1. Thông tin cá nhân
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+              <div className="lg:col-span-4 space-y-8 border-r-2 border-red-50 pr-8">
+                <h4 className="text-[12px] font-black uppercase tracking-[0.2em] text-red-950 flex items-center gap-3">
+                  <span className="w-10 h-0.5 bg-red-900/20"></span> 1. Nhân thân
                 </h4>
-                <div className="space-y-5">
+                <div className="space-y-6">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Họ và tên</label>
-                    <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl focus:border-gold outline-none font-bold text-lg" placeholder="Ví dụ: Lê Văn A" />
+                    <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Họ và Tên khai sinh</label>
+                    <input type="text" value={editingMember.name} onChange={(e) => setEditingMember({...editingMember, name: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl focus:border-red-900 outline-none font-bold text-xl text-red-950" placeholder="Ví dụ: Lê Văn A" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Năm sinh</label>
-                      <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold" placeholder="19xx" />
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Tên tự / Hiệu</label>
+                      <input type="text" value={editingMember.nickname || ''} onChange={(e) => setEditingMember({...editingMember, nickname: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl font-bold" placeholder="Tự..." />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Ngày mất (ÂL)</label>
-                      <input type="text" value={editingMember.lunarDeathDate || editingMember.deathDate || ''} onChange={(e) => setEditingMember({...editingMember, lunarDeathDate: e.target.value, deathDate: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-bold text-red-900" placeholder="15/1" />
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Chức vụ / Học vị</label>
+                      <input type="text" value={editingMember.title || ''} onChange={(e) => setEditingMember({...editingMember, title: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl font-bold" placeholder="Tiến sĩ, Trưởng tộc..." />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Năm sinh</label>
+                      <input type="text" value={editingMember.birthDate || ''} onChange={(e) => setEditingMember({...editingMember, birthDate: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl font-bold" placeholder="19xx" />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Ngày mất (Âm lịch)</label>
+                      <input type="text" value={editingMember.lunarDeathDate || editingMember.deathDate || ''} onChange={(e) => setEditingMember({...editingMember, lunarDeathDate: e.target.value, deathDate: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl font-bold text-red-700" placeholder="Ngày/Tháng ÂL" />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider ml-1">Tiểu sử ngắn</label>
-                    <textarea value={editingMember.bio || ''} onChange={(e) => setEditingMember({...editingMember, bio: e.target.value})} className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-2xl font-medium h-24" placeholder="Thông tin thêm..." />
+                    <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Mộ phần / Nơi an táng</label>
+                    <input type="text" value={editingMember.restingPlace || ''} onChange={(e) => setEditingMember({...editingMember, restingPlace: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl font-bold text-red-950" placeholder="Nghĩa trang, Cánh đồng..." />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-gray-400 tracking-wider ml-1">Tiểu sử / Hành trạng</label>
+                    <textarea value={editingMember.bio || ''} onChange={(e) => setEditingMember({...editingMember, bio: e.target.value})} className="w-full bg-red-50/30 border-2 border-red-100 p-4 rounded-2xl font-medium h-32 leading-relaxed" placeholder="Ghi chú về cuộc đời, sự nghiệp, đóng góp cho dòng họ..." />
                   </div>
                 </div>
               </div>
-              <div className="space-y-8">
+
+              <div className="lg:col-span-4 space-y-8 border-r-2 border-red-50 pr-8">
                 <div className="flex justify-between items-center">
-                   <h4 className="text-[11px] font-black uppercase tracking-widest text-pink-700 flex items-center gap-2">
-                     <span className="w-2 h-2 rounded-full bg-pink-600"></span> 2. Vợ / Chồng
+                   <h4 className="text-[12px] font-black uppercase tracking-[0.2em] text-pink-800 flex items-center gap-3">
+                     <span className="w-10 h-0.5 bg-pink-600/20"></span> 2. Phối ngẫu
                    </h4>
-                   <button onClick={() => setEditingMember({...editingMember, spouses: [...(editingMember.spouses || []), { id: `s-${Date.now()}`, name: '' }]})} className="bg-pink-100 text-pink-700 w-8 h-8 rounded-full flex items-center justify-center font-bold hover:bg-pink-600 hover:text-white transition-all shadow-sm">+</button>
+                   <button onClick={() => setEditingMember({...editingMember, spouses: [...(editingMember.spouses || []), { id: `s-${Date.now()}`, name: '' }]})} className="bg-pink-100 text-pink-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase hover:bg-pink-600 hover:text-white transition-all shadow-sm">Thêm Bà</button>
                 </div>
-                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-hide">
+                <div className="space-y-6 max-h-[600px] overflow-y-auto pr-4 scrollbar-hide">
+                  {(editingMember.spouses || []).length === 0 && (
+                    <div className="text-center py-10 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                      <p className="text-gray-400 text-xs italic">Chưa cập nhật thông tin phối ngẫu</p>
+                    </div>
+                  )}
                   {(editingMember.spouses || []).map((s, idx) => (
-                    <div key={s.id} className="p-5 bg-pink-50/50 border-2 border-pink-100/50 rounded-2xl relative group">
-                      <button onClick={() => setEditingMember({...editingMember, spouses: editingMember.spouses?.filter(sp => sp.id !== s.id)})} className="absolute -top-3 -right-3 bg-red-100 text-red-600 w-7 h-7 rounded-full text-sm opacity-0 group-hover:opacity-100 transition-all shadow-md">×</button>
+                    <div key={s.id} className="p-6 bg-pink-50/30 border-2 border-pink-100/50 rounded-3xl relative group shadow-sm">
+                      <button onClick={() => setEditingMember({...editingMember, spouses: editingMember.spouses?.filter(sp => sp.id !== s.id)})} className="absolute -top-3 -right-3 bg-red-100 text-red-600 w-8 h-8 rounded-full text-sm opacity-0 group-hover:opacity-100 transition-all shadow-md flex items-center justify-center">×</button>
                       <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                           <span className="bg-pink-600 text-white w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black">{idx + 1}</span>
+                           <span className="text-[10px] font-black uppercase text-pink-400 tracking-widest">Vợ / Chồng</span>
+                        </div>
                         <input type="text" value={s.name} onChange={(e) => {
                             const newSpouses = [...(editingMember.spouses || [])];
                             newSpouses[idx].name = e.target.value;
                             setEditingMember({...editingMember, spouses: newSpouses});
-                          }} className="w-full bg-white border-b-2 border-pink-200 p-2 outline-none font-bold text-pink-950" placeholder="Họ tên vợ/chồng..." />
-                        <div className="flex gap-2 items-center">
-                          <span className="text-[8px] font-black uppercase text-pink-300">Giỗ ÂL:</span>
-                          <input type="text" value={s.deathDate || ''} onChange={(e) => {
-                              const newSpouses = [...(editingMember.spouses || [])];
-                              newSpouses[idx].deathDate = e.target.value;
-                              setEditingMember({...editingMember, spouses: newSpouses});
-                            }} className="flex-1 bg-transparent border-b border-pink-100 p-1 text-xs" placeholder="Ngày..." />
+                          }} className="w-full bg-white border-2 border-pink-100 p-4 rounded-2xl outline-none font-bold text-pink-950" placeholder="Họ tên phối ngẫu..." />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[8px] font-black uppercase text-pink-300 ml-1">Ngày giỗ (ÂL)</label>
+                            <input type="text" value={s.deathDate || ''} onChange={(e) => {
+                                const newSpouses = [...(editingMember.spouses || [])];
+                                newSpouses[idx].deathDate = e.target.value;
+                                setEditingMember({...editingMember, spouses: newSpouses});
+                              }} className="w-full bg-white border-2 border-pink-50 p-3 rounded-xl text-xs font-bold" placeholder="Ngày..." />
+                          </div>
+                          <div>
+                            <label className="text-[8px] font-black uppercase text-pink-300 ml-1">Mộ phần</label>
+                            <input type="text" value={s.restingPlace || ''} onChange={(e) => {
+                                const newSpouses = [...(editingMember.spouses || [])];
+                                newSpouses[idx].restingPlace = e.target.value;
+                                setEditingMember({...editingMember, spouses: newSpouses});
+                              }} className="w-full bg-white border-2 border-pink-50 p-3 rounded-xl text-xs font-bold" placeholder="Nơi an táng..." />
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="space-y-8">
+
+              <div className="lg:col-span-4 space-y-8">
                  <div className="flex justify-between items-center">
-                   <h4 className="text-[11px] font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2">
-                     <span className="w-2 h-2 rounded-full bg-emerald-600"></span> 3. Con cái
+                   <h4 className="text-[12px] font-black uppercase tracking-[0.2em] text-emerald-800 flex items-center gap-3">
+                     <span className="w-10 h-0.5 bg-emerald-600/20"></span> 3. Hậu duệ
                    </h4>
                    <button onClick={() => addChildToMember(editingMember.id)} className="bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase hover:bg-emerald-600 hover:text-white transition-all shadow-sm">Thêm con</button>
                  </div>
-                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 scrollbar-hide">
+                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-4 scrollbar-hide">
+                    {(editingMember.children || []).length === 0 && (
+                      <div className="text-center py-10 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                        <p className="text-gray-400 text-xs italic">Chưa có thông tin hậu duệ</p>
+                      </div>
+                    )}
                     {(editingMember.children || []).map((child, idx) => (
-                      <div key={child.id} className="p-4 bg-emerald-50/50 border-2 border-emerald-100/30 rounded-2xl flex flex-col gap-3">
+                      <div key={child.id} className="p-5 bg-emerald-50/30 border-2 border-emerald-100/30 rounded-3xl flex flex-col gap-4 shadow-sm relative group">
                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-emerald-950 text-sm truncate max-w-[120px]">{child.name}</span>
+                            <div className="flex items-center gap-2">
+                               <span className={`w-3 h-3 rounded-full ${child.isMale ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
+                               <span className="font-bold text-emerald-950 text-base">{child.name}</span>
+                            </div>
                             <button onClick={() => {
-                                const newChildren = [...(editingMember.children || [])];
-                                newChildren.splice(idx, 1);
-                                setEditingMember({...editingMember, children: newChildren});
-                              }} className="text-[10px] font-black text-red-400 hover:text-red-600">Xoá</button>
+                                if(confirm(`Xoá ${child.name} khỏi danh sách con?`)) {
+                                  const newChildren = [...(editingMember.children || [])];
+                                  newChildren.splice(idx, 1);
+                                  setEditingMember({...editingMember, children: newChildren});
+                                }
+                              }} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                              </button>
                          </div>
-                         <div className="flex flex-col gap-1">
-                            <label className="text-[8px] font-black uppercase text-emerald-300 tracking-wider">Là con của mẹ:</label>
+                         <div className="bg-white p-3 rounded-2xl border border-emerald-100">
+                            <label className="text-[9px] font-black uppercase text-emerald-300 tracking-wider block mb-1">Xác nhận mẹ đẻ:</label>
                             <select value={child.otherParentId || ''} onChange={(e) => {
                                 const newChildren = [...(editingMember.children || [])];
                                 newChildren[idx] = {...newChildren[idx], otherParentId: e.target.value};
                                 setEditingMember({...editingMember, children: newChildren});
-                              }} className="w-full bg-white border border-emerald-100 p-2 rounded-xl text-xs font-bold text-emerald-900 outline-none">
-                               <option value="">-- Không rõ --</option>
+                              }} className="w-full bg-transparent p-1 text-xs font-bold text-emerald-900 outline-none">
+                               <option value="">-- Không xác định --</option>
                                {(editingMember.spouses || []).map(s => (
                                  <option key={s.id} value={s.id}>{s.name || 'Vợ chưa đặt tên'}</option>
                                ))}
@@ -378,9 +430,10 @@ const App: React.FC = () => {
                  </div>
               </div>
             </div>
-            <div className="flex flex-col md:flex-row gap-4 mt-16 pt-10 border-t-4 border-gray-50">
-              <button onClick={() => { updateMemberInTree(editingMember); setEditingMember(null); showToast("Đã cập nhật gia phả"); }} className="bg-primary text-gold px-12 py-5 rounded-2xl font-black uppercase shadow-2xl flex-1 hover:brightness-110 active:scale-95 transition-all text-sm tracking-widest">Lưu thay đổi</button>
-              <button onClick={() => setEditingMember(null)} className="bg-gray-100 text-gray-500 px-12 py-5 rounded-2xl font-black uppercase flex-1 hover:bg-gray-200 transition-all text-sm tracking-widest">Hủy & Đóng</button>
+
+            <div className="flex flex-col md:flex-row gap-6 mt-16 pt-10 border-t-4 border-red-50">
+              <button onClick={() => { updateMemberInTree(editingMember); setEditingMember(null); showToast("Đã cập nhật gia phả"); }} className="bg-red-950 text-gold px-16 py-6 rounded-[2rem] font-black uppercase shadow-2xl flex-1 hover:scale-[1.02] active:scale-95 transition-all text-sm tracking-[0.2em] border-2 border-gold/20">Cập nhật Phả Bản</button>
+              <button onClick={() => setEditingMember(null)} className="bg-gray-100 text-gray-400 px-12 py-6 rounded-[2rem] font-black uppercase flex-1 hover:bg-gray-200 transition-all text-sm tracking-[0.2em]">Hủy & Đóng</button>
             </div>
           </div>
         </div>
