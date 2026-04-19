@@ -115,7 +115,7 @@ const App: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123') { setIsAdmin(true); setShowLogin(false); setPassword(''); showToast("Chế độ Quản trị đã mở"); }
+    if (password === 'admin') { setIsAdmin(true); setShowLogin(false); setPassword(''); showToast("Chế độ Quản trị đã mở"); }
     else showToast("Sai mật khẩu!", "error");
   };
 
