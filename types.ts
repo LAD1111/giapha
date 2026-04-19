@@ -72,3 +72,9 @@ export interface AppData {
   lastUpdated: string;
   theme?: AppTheme;
 }
+
+declare global {
+  interface Window {
+    getLunarDate: (d: number, m: number, y: number, tz: number) => number[];
+  }
+}
